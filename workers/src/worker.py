@@ -44,6 +44,12 @@ async def on_fetch(request, env):
     if path == "/api/validate-code" and method == "POST":
         return await handle_validate_code(request, env, cors_headers)
 
+    if path == "/api/search-competitions" and method == "POST":
+        return await handle_search_competitions(request, env, cors_headers)
+
+    if path == "/api/fetch-url" and method == "POST":
+        return await handle_fetch_url(request, cors_headers)
+
     return json_response({"error": "Not found"}, cors_headers, 404)
 
 
@@ -84,6 +90,7 @@ async def handle_generate_plan(request, env, cors_headers):
                 "https://api.anthropic.com/v1/messages",
                 headers={
                     "Content-Type": "application/json",
+                    "Accept-Encoding": "identity",  # Disable compression for Pyodide compatibility
                     "x-api-key": api_key,
                     "anthropic-version": "2023-06-01",
                 },
@@ -188,6 +195,7 @@ async def handle_chat(request, env, cors_headers):
                 "https://api.anthropic.com/v1/messages",
                 headers={
                     "Content-Type": "application/json",
+                    "Accept-Encoding": "identity",  # Disable compression for Pyodide compatibility
                     "x-api-key": api_key,
                     "anthropic-version": "2023-06-01",
                 },
@@ -269,3 +277,189 @@ async def handle_validate_code(request, env, cors_headers):
 
     except Exception as e:
         return json_response({"valid": False, "error": str(e)}, cors_headers, 500)
+
+
+async def handle_fetch_url(request, cors_headers):
+    """Fetch a URL and return text content for Claude to parse."""
+    import re
+    import httpx
+    from urllib.parse import urlparse
+
+    def html_to_text(html):
+        """Convert HTML to readable text."""
+        text = re.sub(r"<script[^>]*>[\s\S]*?</script>", "", html, flags=re.IGNORECASE)
+        text = re.sub(r"<style[^>]*>[\s\S]*?</style>", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"<head[^>]*>[\s\S]*?</head>", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
+        text = re.sub(r"</p>", "\n\n", text, flags=re.IGNORECASE)
+        text = re.sub(r"</div>", "\n", text, flags=re.IGNORECASE)
+        text = re.sub(r"</tr>", "\n", text, flags=re.IGNORECASE)
+        text = re.sub(r"</li>", "\n", text, flags=re.IGNORECASE)
+        text = re.sub(r"</h[1-6]>", "\n\n", text, flags=re.IGNORECASE)
+        text = re.sub(r"<td[^>]*>", "\t", text, flags=re.IGNORECASE)
+        text = re.sub(r"<th[^>]*>", "\t", text, flags=re.IGNORECASE)
+        text = re.sub(r"<[^>]+>", "", text)
+        entities = {"&nbsp;": " ", "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'"}
+        for entity, char in entities.items():
+            text = text.replace(entity, char)
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        return text.strip()
+
+    try:
+        body = await request.json()
+        body = json.loads(JSON.stringify(body))
+        url = body.get("url", "")
+
+        # Validate URL
+        try:
+            parsed = urlparse(url)
+            if parsed.scheme not in ("http", "https"):
+                return json_response({"success": False, "error": "Invalid URL protocol"}, cors_headers)
+        except Exception:
+            return json_response({"success": False, "error": "Invalid URL"}, cors_headers)
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                url,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (compatible; AthleticsAnnualPlan/1.0)",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                },
+                follow_redirects=True,
+                timeout=30.0,
+            )
+
+            if response.status_code != 200:
+                return json_response({"success": False, "error": f"Failed to fetch URL: {response.status_code}"}, cors_headers)
+
+            text = html_to_text(response.text)
+            max_length = 15000
+            truncated = len(text) > max_length
+            content = text[:max_length] + "\n\n[Content truncated...]" if truncated else text
+
+            return json_response({
+                "success": True,
+                "url": url,
+                "content": content,
+                "truncated": truncated,
+                "original_length": len(text),
+            }, cors_headers)
+
+    except Exception as e:
+        return json_response({"success": False, "error": str(e)}, cors_headers, 500)
+
+
+async def handle_search_competitions(request, env, cors_headers):
+    """Search for athletics competitions using Claude with web search."""
+    import httpx
+
+    api_key = getattr(env, "CLAUDE_API_KEY", None)
+    if not api_key:
+        return json_response({"success": False, "error": "Claude API key not configured"}, cors_headers, 500)
+
+    try:
+        body = await request.json()
+        body = json.loads(JSON.stringify(body))
+
+        season_year = body.get("season_year", "2025/2026")
+        country = body.get("country", "Ireland")
+        event_group = body.get("event_group", "Sprints")
+        age_groups = body.get("age_groups", ["Senior"])
+        comp_levels = body.get("comp_levels", ["National"])
+        federation_url = body.get("federation_url")
+
+        start_year = season_year.split("/")[0]
+        end_year = season_year.split("/")[1]
+        age_groups_text = ", ".join(age_groups)
+        is_masters = "Masters" in age_groups
+
+        # Build competition requirements
+        comp_requirements = []
+        if "National" in comp_levels:
+            comp_requirements.append(f"- National Indoor Championships (typically Jan-Mar {end_year})")
+            comp_requirements.append(f"- National Outdoor Championships (typically Jun-Aug {end_year})")
+        if "European" in comp_levels:
+            if is_masters:
+                comp_requirements.append("- European Masters Indoor/Outdoor Championships")
+            else:
+                comp_requirements.append("- European Indoor/Outdoor Championships (if applicable)")
+        if "World" in comp_levels:
+            if is_masters:
+                comp_requirements.append("- World Masters Athletics Championships")
+            else:
+                comp_requirements.append("- World Indoor/Outdoor Championships (if applicable)")
+        if "Leagues" in comp_levels:
+            comp_requirements.append("- National League events and graded meets")
+
+        comp_list = "\n".join(comp_requirements) if comp_requirements else "- National Championships"
+        federation_hint = f"\n\nStart by checking: {federation_url}" if federation_url else ""
+
+        prompt = f"""Search for track and field athletics competitions for the {season_year} season in {country}.
+
+I need competitions suitable for {age_groups_text} athletes in {event_group} events.
+
+Competitions to find:
+{comp_list}{federation_hint}
+
+Return the competitions as a JSON array sorted by date:
+```json
+[{{"name": "Competition Name", "date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD", "location": "City, Country", "importance": 1, "type": "indoor"}}]
+```
+
+Importance: 1=Major championship, 2=Significant, 3=Development
+Type: "indoor" or "outdoor"
+
+Only return the JSON array, no other text."""
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "Content-Type": "application/json",
+                    "Accept-Encoding": "identity",  # Disable compression for Pyodide compatibility
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                },
+                json={
+                    "model": "claude-haiku-4-5-20251001",
+                    "max_tokens": 4096,
+                    "tools": [{"type": "web_search_20250305", "name": "web_search"}],
+                    "messages": [{"role": "user", "content": prompt}],
+                },
+                timeout=120.0,
+            )
+
+            if response.status_code != 200:
+                return json_response({"success": False, "error": f"Search failed (status {response.status_code})"}, cors_headers)
+
+            data = response.json()
+
+            # Extract text from response
+            response_text = ""
+            for block in data.get("content", []):
+                if block.get("type") == "text":
+                    response_text += block.get("text", "")
+
+            # Parse JSON from response
+            competitions = []
+            try:
+                start_idx = response_text.find("[")
+                end_idx = response_text.rfind("]") + 1
+                if start_idx != -1 and end_idx > start_idx:
+                    raw_competitions = json.loads(response_text[start_idx:end_idx])
+                    for comp in raw_competitions:
+                        competitions.append({
+                            "name": comp.get("name", "Unknown"),
+                            "date": comp.get("date", ""),
+                            "end_date": comp.get("end_date"),
+                            "location": comp.get("location"),
+                            "importance": comp.get("importance", 3),
+                            "type": comp.get("type"),
+                        })
+            except json.JSONDecodeError:
+                pass
+
+            return json_response({"success": True, "competitions": competitions}, cors_headers)
+
+    except Exception as e:
+        return json_response({"success": False, "error": str(e)}, cors_headers, 500)
