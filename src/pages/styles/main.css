@@ -1196,6 +1196,9 @@ body {
   max-width: none;
   padding: 0;
   gap: 0;
+  /* Break out of app-main's max-width constraint */
+  width: 100vw;
+  margin-left: calc(-50vw + 50%);
 }
 
 .step-preview-section.active {
@@ -1225,7 +1228,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-sm) var(--space-md);
+  padding: var(--space-md) var(--space-lg);
   background: var(--surface-card);
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
@@ -1298,7 +1301,7 @@ body {
 .spreadsheet-scroll-container {
   flex: 1;
   overflow: auto;
-  padding: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
 }
 
 /* Spreadsheet grid */
@@ -1424,17 +1427,17 @@ body {
 /* Simple Plan Table */
 .plan-table {
   border-collapse: collapse;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   min-width: max-content;
 }
 
 .plan-table th,
 .plan-table td {
   border: 1px solid var(--border-subtle);
-  padding: 4px 8px;
+  padding: 6px 10px;
   text-align: center;
   white-space: nowrap;
-  min-width: 50px;
+  min-width: 60px;
 }
 
 .plan-table th {
@@ -1448,7 +1451,7 @@ body {
   background: var(--surface-card);
   font-weight: 600;
   text-align: left;
-  min-width: 100px;
+  min-width: 110px;
   z-index: 1;
 }
 
@@ -1460,6 +1463,61 @@ body {
   background: #1ABC9C;
   color: white;
   font-weight: bold;
+}
+
+/* Detailed Plan Table - wider cells for full content */
+.plan-table-detailed th,
+.plan-table-detailed td {
+  min-width: 80px;
+  padding: 8px 12px;
+}
+
+.plan-table-detailed .label-cell {
+  min-width: 120px;
+}
+
+/* Allow text wrapping in content rows */
+.plan-table-detailed tr:nth-child(n+6) td:not(.label-cell) {
+  white-space: normal;
+  min-width: 100px;
+  max-width: 150px;
+  font-size: 0.75rem;
+  vertical-align: top;
+}
+
+/* Merged row styling */
+.plan-table .merged-row td:not(.label-cell) {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* Daily intensity visualization */
+.daily-intensity-row td {
+  padding: 4px 2px;
+}
+
+.daily-intensity-cell {
+  vertical-align: middle;
+}
+
+.intensity-dots {
+  display: flex;
+  gap: 2px;
+  justify-content: center;
+  align-items: center;
+}
+
+.intensity-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  display: inline-block;
+  cursor: help;
+}
+
+/* Wider cells for detailed view to fit 7 dots */
+.plan-table-detailed .daily-intensity-cell {
+  min-width: 70px;
 }
 
 .toolbar-info {
@@ -1483,6 +1541,182 @@ body {
   padding: var(--space-md);
   display: flex;
   justify-content: flex-start;
+}
+
+/* ============================================
+   COMPETITION SELECTOR
+   ============================================ */
+
+.competitions-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.competitions-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3xl);
+  color: var(--text-secondary);
+}
+
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 3px solid var(--surface-elevated);
+  border-top-color: var(--accent-gold);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: var(--space-md);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.competitions-error {
+  text-align: center;
+  padding: var(--space-xl);
+  color: var(--accent-red);
+}
+
+.competitions-error .error-message {
+  margin-bottom: var(--space-md);
+}
+
+.competitions-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.competition-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.competition-item:hover {
+  background: var(--surface-elevated);
+  border-color: var(--accent-gold);
+}
+
+.competition-item.selected {
+  background: rgba(245, 166, 35, 0.1);
+  border-color: var(--accent-gold);
+}
+
+.competition-checkbox {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent-gold);
+  cursor: pointer;
+}
+
+.competition-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.competition-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.competition-meta {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  display: flex;
+  gap: var(--space-md);
+}
+
+.competition-importance {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.9rem;
+}
+
+.competition-importance.major { color: #E74C3C; }
+.competition-importance.significant { color: #F39C12; }
+.competition-importance.development { color: #3498DB; }
+
+.competition-type {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.competition-type.indoor {
+  background: #3498DB;
+  color: white;
+}
+
+.competition-type.outdoor {
+  background: #27AE60;
+  color: white;
+}
+
+/* Add custom competition */
+.add-custom-section {
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.btn-add-custom {
+  background: transparent;
+  border: 1px dashed var(--border-subtle);
+  color: var(--text-secondary);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: 8px;
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.2s ease;
+}
+
+.btn-add-custom:hover {
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+}
+
+.custom-competition-form {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.custom-competition-form .form-input,
+.custom-competition-form .form-select {
+  flex: 1;
+  min-width: 150px;
+  padding: var(--space-sm);
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  color: var(--text-primary);
+}
+
+.custom-competition-form .form-input:focus,
+.custom-competition-form .form-select:focus {
+  outline: none;
+  border-color: var(--accent-gold);
 }
 
 /* ============================================

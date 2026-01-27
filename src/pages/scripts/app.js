@@ -1,16 +1,29 @@
 /**
  * Main application controller
- * Handles step navigation, spreadsheet coordination, and download
+ * Handles step navigation, competition selection, plan generation, and download
  */
 
-import { chatManager } from './chat.js';
 import { SpreadsheetManager } from './spreadsheet.js';
 import { API_BASE } from './config.js';
+
+// Federation data for URL lookup
+const FEDERATIONS = {
+  'Ireland': 'https://www.athleticsireland.ie/competition/fixtures',
+  'United Kingdom': 'https://www.uka.org.uk/events/',
+  'United States': 'https://www.usatf.org/events',
+  'Australia': 'https://www.athletics.com.au/events/',
+  'Canada': 'https://athletics.ca/events/',
+  'Germany': 'https://www.leichtathletik.de/termine',
+  'France': 'https://www.athle.fr/calendrier.aspx',
+  'Spain': 'https://www.rfea.es/web/calendario/',
+};
 
 class App {
   constructor() {
     this.currentStep = 1;
     this.formData = null;
+    this.selectedCompetitions = [];
+    this.allCompetitions = [];
     this.plan = null;
     this.spreadsheet = null;
 
@@ -44,10 +57,21 @@ class App {
     // Form elements
     this.planForm = document.getElementById('plan-form');
 
+    // Competition elements
+    this.competitionsSubtitle = document.getElementById('competitions-subtitle');
+    this.competitionsLoading = document.getElementById('competitions-loading');
+    this.competitionsError = document.getElementById('competitions-error');
+    this.competitionsList = document.getElementById('competitions-list');
+    this.addCustomSection = document.getElementById('add-custom-section');
+    this.retrySearchBtn = document.getElementById('retry-search');
+    this.toggleCustomFormBtn = document.getElementById('toggle-custom-form');
+    this.customForm = document.getElementById('custom-form');
+    this.addCustomBtn = document.getElementById('add-custom-btn');
+
     // Navigation buttons
     this.backToFormBtn = document.getElementById('back-to-form');
     this.generatePlanBtn = document.getElementById('generate-plan-btn');
-    this.backToChatBtn = document.getElementById('back-to-chat');
+    this.backToCompetitionsBtn = document.getElementById('back-to-competitions');
 
     // Spreadsheet container
     this.spreadsheetContainer = document.getElementById('spreadsheet-container');
@@ -63,7 +87,12 @@ class App {
     // Navigation
     this.backToFormBtn?.addEventListener('click', () => this.goToStep(1));
     this.generatePlanBtn?.addEventListener('click', () => this.handleGeneratePlan());
-    this.backToChatBtn?.addEventListener('click', () => this.goToStep(2));
+    this.backToCompetitionsBtn?.addEventListener('click', () => this.goToStep(2));
+
+    // Competition actions
+    this.retrySearchBtn?.addEventListener('click', () => this.searchCompetitions());
+    this.toggleCustomFormBtn?.addEventListener('click', () => this.toggleCustomForm());
+    this.addCustomBtn?.addEventListener('click', () => this.addCustomCompetition());
 
     // Download from spreadsheet toolbar
     this.spreadsheetContainer?.addEventListener('download-excel', (e) => {
@@ -93,11 +122,273 @@ class App {
       targetCompetitions: formData.get('targetCompetitions'),
     };
 
-    // Go to chat step
+    // Go to competitions step and search
     this.goToStep(2);
+    this.searchCompetitions();
+  }
 
-    // Start conversation with Claude
-    chatManager.startConversation(this.formData);
+  /**
+   * Search for competitions based on form data
+   */
+  async searchCompetitions() {
+    // Show loading state
+    this.competitionsLoading.style.display = 'flex';
+    this.competitionsError.style.display = 'none';
+    this.competitionsList.style.display = 'none';
+    this.addCustomSection.style.display = 'none';
+    this.generatePlanBtn.disabled = true;
+
+    this.competitionsSubtitle.textContent = `Searching competitions for ${this.formData.season} season...`;
+
+    try {
+      const federationUrl = FEDERATIONS[this.formData.country] || null;
+
+      const response = await fetch(`${API_BASE}/api/search-competitions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          country: this.formData.country,
+          season_year: this.formData.season,
+          age_groups: this.formData.ageGroups,
+          event_group: this.formData.eventGroup,
+          comp_levels: this.formData.compLevels.map(l => l.charAt(0).toUpperCase() + l.slice(1)),
+          federation_url: federationUrl,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to search competitions');
+      }
+
+      this.allCompetitions = data.competitions || [];
+      this.selectedCompetitions = [];
+
+      // Auto-select major competitions
+      this.allCompetitions.forEach((comp, index) => {
+        if (comp.importance === 1) {
+          this.selectedCompetitions.push(index);
+        }
+      });
+
+      this.renderCompetitions();
+    } catch (error) {
+      console.error('Competition search error:', error);
+      this.showCompetitionError(error.message);
+    }
+  }
+
+  /**
+   * Render the competition list
+   */
+  renderCompetitions() {
+    this.competitionsLoading.style.display = 'none';
+    this.competitionsError.style.display = 'none';
+    this.competitionsList.style.display = 'flex';
+    this.addCustomSection.style.display = 'block';
+
+    const count = this.allCompetitions.length;
+    this.competitionsSubtitle.textContent = `Found ${count} competition${count !== 1 ? 's' : ''} for ${this.formData.season} season`;
+
+    this.competitionsList.textContent = '';
+
+    if (count === 0) {
+      const emptyMsg = document.createElement('p');
+      emptyMsg.style.cssText = 'color: var(--text-secondary); text-align: center; padding: var(--space-xl);';
+      emptyMsg.textContent = 'No competitions found. Try adding custom competitions below.';
+      this.competitionsList.appendChild(emptyMsg);
+    } else {
+      this.allCompetitions.forEach((comp, index) => {
+        const isSelected = this.selectedCompetitions.includes(index);
+        const item = this.createCompetitionItem(comp, index, isSelected);
+        this.competitionsList.appendChild(item);
+      });
+    }
+
+    this.updateGenerateButton();
+  }
+
+  /**
+   * Create a competition list item
+   */
+  createCompetitionItem(comp, index, isSelected) {
+    const div = document.createElement('div');
+    div.className = `competition-item${isSelected ? ' selected' : ''}`;
+    div.dataset.index = index;
+
+    // Checkbox
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'competition-checkbox';
+    checkbox.checked = isSelected;
+    div.appendChild(checkbox);
+
+    // Details container
+    const details = document.createElement('div');
+    details.className = 'competition-details';
+
+    const name = document.createElement('span');
+    name.className = 'competition-name';
+    name.textContent = comp.name;
+    details.appendChild(name);
+
+    const meta = document.createElement('span');
+    meta.className = 'competition-meta';
+
+    const dateSpan = document.createElement('span');
+    dateSpan.textContent = this.formatCompetitionDate(comp.date, comp.end_date);
+    meta.appendChild(dateSpan);
+
+    if (comp.location) {
+      const locSpan = document.createElement('span');
+      locSpan.textContent = comp.location;
+      meta.appendChild(locSpan);
+    }
+
+    details.appendChild(meta);
+    div.appendChild(details);
+
+    // Type badge
+    const typeClass = comp.type || 'outdoor';
+    const typeBadge = document.createElement('span');
+    typeBadge.className = `competition-type ${typeClass}`;
+    typeBadge.textContent = typeClass;
+    div.appendChild(typeBadge);
+
+    // Importance stars
+    const importanceClass = comp.importance === 1 ? 'major' : comp.importance === 2 ? 'significant' : 'development';
+    const importanceSpan = document.createElement('span');
+    importanceSpan.className = `competition-importance ${importanceClass}`;
+    importanceSpan.textContent = '\u2B50'.repeat(4 - comp.importance);
+    div.appendChild(importanceSpan);
+
+    div.addEventListener('click', (e) => {
+      if (e.target.type !== 'checkbox') {
+        checkbox.checked = !checkbox.checked;
+      }
+      this.toggleCompetition(index);
+    });
+
+    return div;
+  }
+
+  /**
+   * Format competition date for display
+   */
+  formatCompetitionDate(date, endDate) {
+    if (!date) return 'TBD';
+
+    const start = new Date(date);
+    const options = { month: 'short', day: 'numeric' };
+    let str = start.toLocaleDateString('en-GB', options);
+
+    if (endDate && endDate !== date) {
+      const end = new Date(endDate);
+      str += ` - ${end.toLocaleDateString('en-GB', options)}`;
+    }
+
+    return str;
+  }
+
+  /**
+   * Toggle competition selection
+   */
+  toggleCompetition(index) {
+    const idx = this.selectedCompetitions.indexOf(index);
+    if (idx === -1) {
+      this.selectedCompetitions.push(index);
+    } else {
+      this.selectedCompetitions.splice(idx, 1);
+    }
+
+    // Update UI
+    const items = this.competitionsList.querySelectorAll('.competition-item');
+    items.forEach(item => {
+      const itemIndex = parseInt(item.dataset.index);
+      const isSelected = this.selectedCompetitions.includes(itemIndex);
+      item.classList.toggle('selected', isSelected);
+      item.querySelector('.competition-checkbox').checked = isSelected;
+    });
+
+    this.updateGenerateButton();
+  }
+
+  /**
+   * Update generate button state
+   */
+  updateGenerateButton() {
+    const hasSelection = this.selectedCompetitions.length > 0;
+    this.generatePlanBtn.disabled = !hasSelection;
+
+    // Clear and rebuild button content
+    this.generatePlanBtn.textContent = '';
+
+    const text = document.createTextNode(
+      hasSelection ? `GENERATE PLAN (${this.selectedCompetitions.length}) ` : 'SELECT COMPETITIONS '
+    );
+    this.generatePlanBtn.appendChild(text);
+
+    const arrow = document.createElement('span');
+    arrow.textContent = '\u2192';
+    this.generatePlanBtn.appendChild(arrow);
+  }
+
+  /**
+   * Show competition search error
+   */
+  showCompetitionError(message) {
+    this.competitionsLoading.style.display = 'none';
+    this.competitionsError.style.display = 'block';
+    this.competitionsList.style.display = 'none';
+    this.addCustomSection.style.display = 'none';
+
+    this.competitionsError.querySelector('.error-message').textContent = message;
+    this.competitionsSubtitle.textContent = 'Failed to find competitions';
+  }
+
+  /**
+   * Toggle custom competition form
+   */
+  toggleCustomForm() {
+    const isVisible = this.customForm.style.display !== 'none';
+    this.customForm.style.display = isVisible ? 'none' : 'flex';
+    this.toggleCustomFormBtn.textContent = isVisible ? '+ Add Custom Competition' : '\u2212 Cancel';
+  }
+
+  /**
+   * Add a custom competition
+   */
+  addCustomCompetition() {
+    const name = document.getElementById('custom-name').value.trim();
+    const date = document.getElementById('custom-date').value;
+    const importance = parseInt(document.getElementById('custom-importance').value);
+
+    if (!name || !date) {
+      alert('Please enter a competition name and date');
+      return;
+    }
+
+    const newComp = {
+      name,
+      date,
+      end_date: null,
+      location: null,
+      importance,
+      type: 'outdoor',
+    };
+
+    this.allCompetitions.push(newComp);
+    this.selectedCompetitions.push(this.allCompetitions.length - 1);
+
+    // Reset form
+    document.getElementById('custom-name').value = '';
+    document.getElementById('custom-date').value = '';
+    document.getElementById('custom-importance').value = '3';
+    this.customForm.style.display = 'none';
+    this.toggleCustomFormBtn.textContent = '+ Add Custom Competition';
+
+    this.renderCompetitions();
   }
 
   /**
@@ -108,19 +399,44 @@ class App {
     this.generatePlanBtn.textContent = 'GENERATING...';
 
     try {
-      const plan = await chatManager.generatePlan();
+      // Build target competitions string from selected
+      const selectedComps = this.selectedCompetitions.map(i => this.allCompetitions[i]);
+      const targetCompetitions = selectedComps.map(c => {
+        const dateStr = this.formatCompetitionDate(c.date, c.end_date);
+        return `${c.name} (${dateStr})`;
+      }).join(', ');
 
-      if (plan) {
-        this.plan = plan;
-        this.initSpreadsheet(plan);
-        this.goToStep(3);
+      const sessionId = sessionStorage.getItem('sessionId');
+
+      const response = await fetch(`${API_BASE}/api/generate-plan`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Session-ID': sessionId,
+        },
+        body: JSON.stringify({
+          formData: {
+            ...this.formData,
+            targetCompetitions,
+          },
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to generate plan');
       }
+
+      this.plan = data.plan;
+      this.initSpreadsheet(this.plan);
+      this.goToStep(3);
     } catch (error) {
       console.error('Generate plan error:', error);
       alert(`Failed to generate plan: ${error.message}`);
     } finally {
       this.generatePlanBtn.disabled = false;
-      this.generatePlanBtn.textContent = 'GENERATE PLAN';
+      this.updateGenerateButton();
     }
   }
 
@@ -224,6 +540,8 @@ class App {
   resetApp() {
     this.plan = null;
     this.formData = null;
+    this.selectedCompetitions = [];
+    this.allCompetitions = [];
     this.planForm?.reset();
 
     if (this.spreadsheet) {

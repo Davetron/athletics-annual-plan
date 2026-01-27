@@ -81,7 +81,14 @@ GENERATE_PLAN_TOOL = {
                             "description": "Importance of competition this week (1-3) or null"
                         },
                         "technical": {"type": "string", "description": "Technical focus for the week"},
-                        "physical": {"type": "string", "description": "Physical development focus"}
+                        "physical": {"type": "string", "description": "Physical development focus"},
+                        "dailyIntensity": {
+                            "type": "array",
+                            "items": {"type": "integer", "minimum": 0, "maximum": 4},
+                            "minItems": 7,
+                            "maxItems": 7,
+                            "description": "Daily intensity for Mon-Sun (0=off, 1=recovery, 2=low, 3=moderate, 4=high)"
+                        }
                     }
                 }
             }
@@ -89,10 +96,10 @@ GENERATE_PLAN_TOOL = {
     }
 }
 
-# System prompt for plan generation - EXACT PORT FROM JS
+# System prompt for plan generation
 GENERATION_SYSTEM_PROMPT = """You are an expert athletics coach generating a 52-week periodized annual training plan.
 
-Based on the conversation and athlete information provided, generate a complete plan using the generate_annual_plan tool.
+Based on the athlete information provided, generate a complete plan using the generate_annual_plan tool.
 
 ## Periodization Guidelines
 
@@ -114,14 +121,42 @@ Based on the conversation and athlete information provided, generate a complete 
 - Weeks 29-45: Competition (peak maintenance)
 - Weeks 46-52: Transition / Recovery
 
-### Load Patterns
+## Training Blocks
+Name blocks descriptively based on phase and sequence:
+- "Indoor Block 1", "Indoor Block 2", etc. for bi-phase indoor prep
+- "Outdoor Block 1", "Outdoor Block 2", etc. for outdoor prep
+- "Competition Block", "Taper Block", "Transition Block" as appropriate
+
+Each block typically spans 3-6 weeks with progressive load building.
+
+## Weekly Load Patterns
 - Build progressively within blocks (2 → 3 → 4 → 2 deload)
 - Reduce 1-2 weeks before major competitions
 - Competition weeks: load 1-2
 - Post-competition recovery: load 1-2
 - Avoid consecutive max load (4) weeks
 
-### Phase Characteristics
+## Daily Intensity Patterns
+For each week, provide dailyIntensity as 7 values [Mon, Tue, Wed, Thu, Fri, Sat, Sun]:
+- 0 = Off/Rest
+- 1 = Recovery (easy jog, mobility)
+- 2 = Low (aerobic, technique)
+- 3 = Moderate (tempo, strength)
+- 4 = High (speed, max effort)
+
+Example patterns by weekly load:
+- Load 4 (peak): [3, 4, 1, 3, 4, 2, 0] - Two high days, active recovery
+- Load 3 (build): [2, 3, 1, 3, 2, 1, 0] - Moderate with recovery
+- Load 2 (base): [2, 2, 1, 2, 2, 1, 0] - Consistent low-moderate
+- Load 1 (recovery): [1, 2, 0, 1, 2, 0, 0] - Easy with rest days
+- Load 0 (off): [0, 1, 0, 1, 0, 0, 0] - Minimal activity
+
+Adjust based on:
+- Competition days (reduce day before, recovery day after)
+- Training level (beginners need more recovery)
+- Phase focus (general prep = more volume, competition = more intensity)
+
+## Phase Characteristics
 - General Prep: High volume, lower intensity, aerobic base, general strength
 - Special Prep: Increasing intensity, event-specific conditioning, speed development
 - Competition: Low volume, high intensity, race-specific work, recovery emphasis
@@ -135,8 +170,9 @@ Based on the conversation and athlete information provided, generate a complete 
 CRITICAL REQUIREMENTS:
 1. You MUST generate EXACTLY 52 weeks - no more, no less
 2. The weeks array MUST contain all 52 weeks from week 1 to week 52
-3. Do NOT stop early or abbreviate - every single week must be included
-4. Call the generate_annual_plan tool with the COMPLETE 52-week plan
+3. Every week MUST include dailyIntensity array with exactly 7 values
+4. Do NOT stop early or abbreviate - every single week must be included
+5. Call the generate_annual_plan tool with the COMPLETE 52-week plan
 
 Do not output JSON directly - use the tool."""
 

@@ -92,6 +92,7 @@ class Week(BaseModel):
     competitionImportance: int | None = None
     technical: str | None = None
     physical: str | None = None
+    dailyIntensity: list[int] | None = Field(None, min_length=7, max_length=7)
 
 
 class Plan(BaseModel):
@@ -138,10 +139,11 @@ class SearchCompetitionsRequest(BaseModel):
     """Request to search for competitions."""
 
     country: str = "Ireland"
-    athlete_type: str = "Senior"
     season_year: str
-    include_european: bool = True
-    include_world: bool = False
+    age_groups: list[str] = ["Senior"]
+    event_group: str = "sprints"
+    comp_levels: list[str] = ["National"]
+    federation_url: str | None = None
 
 
 class CompetitionResult(BaseModel):

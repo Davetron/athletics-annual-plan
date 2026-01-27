@@ -73,6 +73,24 @@ ROWS = {
     "block": 18,
     "load_label": 19,
     "load": 20,
+    "daily_label": 21,
+    "daily_mon": 22,
+    "daily_tue": 23,
+    "daily_wed": 24,
+    "daily_thu": 25,
+    "daily_fri": 26,
+    "daily_sat": 27,
+    "daily_sun": 28,
+}
+
+DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+INTENSITY_COLORS = {
+    4: COLORS["load_4"],  # High - red
+    3: COLORS["load_3"],  # Moderate - orange
+    2: COLORS["load_2"],  # Low - yellow
+    1: COLORS["load_1"],  # Recovery - green
+    0: COLORS["load_0"],  # Off - light gray
 }
 
 DATA_START_COL = 2  # Column B
@@ -126,6 +144,9 @@ def generate_excel_from_plan(plan: dict) -> Workbook:
     # Add training load
     _add_training_load(ws, weeks)
 
+    # Add daily intensity
+    _add_daily_intensity(ws, weeks)
+
     # Apply borders
     _apply_borders(ws, weeks)
 
@@ -158,6 +179,14 @@ def _add_row_labels(ws):
         ROWS["block"]: "Block",
         ROWS["load_label"]: "Training Load",
         ROWS["load"]: "",
+        ROWS["daily_label"]: "Daily Intensity",
+        ROWS["daily_mon"]: "Mon",
+        ROWS["daily_tue"]: "Tue",
+        ROWS["daily_wed"]: "Wed",
+        ROWS["daily_thu"]: "Thu",
+        ROWS["daily_fri"]: "Fri",
+        ROWS["daily_sat"]: "Sat",
+        ROWS["daily_sun"]: "Sun",
     }
 
     for row, label in labels.items():
@@ -448,6 +477,46 @@ def _add_training_load(ws, weeks: list):
         load_cell.fill = LOAD_COLORS.get(load, COLORS["load_2"])
 
 
+def _add_daily_intensity(ws, weeks: list):
+    """Add daily intensity pattern with color coding for each day of the week."""
+    day_rows = [
+        ROWS["daily_mon"],
+        ROWS["daily_tue"],
+        ROWS["daily_wed"],
+        ROWS["daily_thu"],
+        ROWS["daily_fri"],
+        ROWS["daily_sat"],
+        ROWS["daily_sun"],
+    ]
+
+    for i, week in enumerate(weeks):
+        col = DATA_START_COL + i
+        daily_intensity = week.get("dailyIntensity", [])
+
+        # If no daily intensity data, use default based on weekly load
+        if not daily_intensity or len(daily_intensity) != 7:
+            load = week.get("load", 2)
+            # Default patterns based on weekly load
+            default_patterns = {
+                4: [3, 4, 1, 3, 4, 2, 0],  # Peak week
+                3: [2, 3, 1, 3, 2, 1, 0],  # Build week
+                2: [2, 2, 1, 2, 2, 1, 0],  # Base week
+                1: [1, 2, 0, 1, 2, 0, 0],  # Recovery week
+                0: [0, 1, 0, 1, 0, 0, 0],  # Off week
+            }
+            daily_intensity = default_patterns.get(load, default_patterns[2])
+
+        # Fill in each day's intensity
+        for day_idx, day_row in enumerate(day_rows):
+            intensity = daily_intensity[day_idx] if day_idx < len(daily_intensity) else 0
+
+            cell = ws.cell(row=day_row, column=col)
+            cell.value = intensity
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.font = Font(size=9)
+            cell.fill = INTENSITY_COLORS.get(intensity, COLORS["load_0"])
+
+
 def _apply_borders(ws, weeks: list):
     """Apply borders to the worksheet."""
     end_col = DATA_START_COL + len(weeks) - 1
@@ -458,8 +527,8 @@ def _apply_borders(ws, weeks: list):
         right=Side(style="thin", color="D0D0D0"),
     )
 
-    # Apply borders to all data cells
-    for row in range(ROWS["month"], ROWS["load"] + 1):
+    # Apply borders to all data cells (including daily intensity rows)
+    for row in range(ROWS["month"], ROWS["daily_sun"] + 1):
         for col in range(1, end_col + 1):
             cell = ws.cell(row=row, column=col)
             cell.border = thin_border

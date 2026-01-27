@@ -226,6 +226,15 @@ async def test_fetch_url_invalid_protocol(client):
 
 def create_mock_plan(athlete="Test Athlete", season="2025/2026"):
     """Create a valid 52-week plan for testing."""
+    # Daily intensity patterns based on load level
+    daily_patterns = {
+        4: [3, 4, 1, 3, 4, 2, 0],  # Peak week
+        3: [2, 3, 1, 3, 2, 1, 0],  # Build week
+        2: [2, 2, 1, 2, 2, 1, 0],  # Base week
+        1: [1, 2, 0, 1, 2, 0, 0],  # Recovery week
+        0: [0, 1, 0, 1, 0, 0, 0],  # Off week
+    }
+
     weeks = []
     for i in range(52):
         week_num = i + 1
@@ -249,6 +258,8 @@ def create_mock_plan(athlete="Test Athlete", season="2025/2026"):
         else:
             phase, phase_type = "End of Season", "taper"
 
+        load = 2 if phase_type == "taper" else 3
+
         weeks.append({
             "weekNum": week_num,
             "startDate": f"2025-{((i // 4) % 12) + 1:02d}-{(i % 4) * 7 + 1:02d}",
@@ -256,11 +267,12 @@ def create_mock_plan(athlete="Test Athlete", season="2025/2026"):
             "phase": phase,
             "phaseType": phase_type,
             "block": f"Block {(i // 8) + 1}",
-            "load": 2 if phase_type == "taper" else 3,
+            "load": load,
             "competitions": [],
             "competitionImportance": None,
             "technical": "Event-specific drills",
-            "physical": "Base building" if "Prep" in phase else "Maintenance"
+            "physical": "Base building" if "Prep" in phase else "Maintenance",
+            "dailyIntensity": daily_patterns.get(load, daily_patterns[2])
         })
 
     return {
@@ -335,6 +347,36 @@ async def test_download_excel_filename(client):
     content_disposition = response.headers.get("content-disposition", "")
     assert "Sprint" in content_disposition or "sprint" in content_disposition.lower()
     assert "2025" in content_disposition
+
+
+@pytest.mark.asyncio
+async def test_download_excel_with_daily_intensity(client):
+    """Test Excel generation includes daily intensity data."""
+    from io import BytesIO
+    from openpyxl import load_workbook
+
+    plan = create_mock_plan()
+
+    # Set specific daily intensities for week 1 to verify
+    plan["weeks"][0]["dailyIntensity"] = [3, 4, 1, 3, 4, 2, 0]
+
+    response = await client.post(
+        "/api/download-excel",
+        json={"plan": plan}
+    )
+
+    assert response.status_code == 200
+
+    # Load the Excel file and verify daily intensity rows exist
+    wb = load_workbook(BytesIO(response.content))
+    ws = wb.active
+
+    # Daily intensity rows should be 22-28 (Mon-Sun)
+    # Column B (col 2) is week 1
+    expected_values = [3, 4, 1, 3, 4, 2, 0]
+    for day_idx, expected in enumerate(expected_values):
+        cell_value = ws.cell(row=22 + day_idx, column=2).value
+        assert cell_value == expected, f"Day {day_idx} intensity should be {expected}, got {cell_value}"
 
 
 # =============================================================================

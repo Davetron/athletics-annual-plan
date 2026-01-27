@@ -184,33 +184,49 @@
 
         <div class="form-actions">
           <button type="submit" class="btn btn-primary">
-            CONTINUE TO CHAT
+            FIND COMPETITIONS
             <span>&rarr;</span>
           </button>
         </div>
       </form>
     </section>
 
-    <!-- Step 2: Competition Discovery Chat (constrained scope) -->
-    <section id="step-chat" class="step-section" data-step="2">
-      <h2 class="step-title">DISCOVER YOUR COMPETITIONS</h2>
-      <p class="step-description">Let's build your competition calendar with priorities</p>
+    <!-- Step 2: Competition Selection -->
+    <section id="step-competitions" class="step-section" data-step="2">
+      <h2 class="step-title">SELECT TARGET COMPETITIONS</h2>
+      <p class="step-description" id="competitions-subtitle">Finding competitions for your season...</p>
 
-      <div class="chat-container">
-        <div id="chat-messages" class="chat-messages">
-          <!-- Messages will be added here -->
+      <div class="competitions-container">
+        <!-- Loading state -->
+        <div id="competitions-loading" class="competitions-loading">
+          <div class="loading-spinner"></div>
+          <p>Searching for competitions...</p>
         </div>
-        <div class="chat-input-container">
-          <input
-            type="text"
-            id="chat-input"
-            class="chat-input"
-            placeholder="Type your response..."
-            autocomplete="off"
-          >
-          <button id="chat-send" class="chat-send" aria-label="Send message">
-            &uarr;
-          </button>
+
+        <!-- Error state -->
+        <div id="competitions-error" class="competitions-error" style="display: none;">
+          <p class="error-message"></p>
+          <button id="retry-search" class="btn btn-secondary">Try Again</button>
+        </div>
+
+        <!-- Competition list -->
+        <div id="competitions-list" class="competitions-list" style="display: none;">
+          <!-- Competitions will be rendered here -->
+        </div>
+
+        <!-- Add custom competition -->
+        <div id="add-custom-section" class="add-custom-section" style="display: none;">
+          <button id="toggle-custom-form" class="btn-add-custom">+ Add Custom Competition</button>
+          <div id="custom-form" class="custom-competition-form" style="display: none;">
+            <input type="text" id="custom-name" placeholder="Competition name" class="form-input">
+            <input type="date" id="custom-date" class="form-input">
+            <select id="custom-importance" class="form-select">
+              <option value="1">⭐⭐⭐ Major Championship</option>
+              <option value="2">⭐⭐ Significant</option>
+              <option value="3" selected>⭐ Development</option>
+            </select>
+            <button id="add-custom-btn" class="btn btn-secondary">Add</button>
+          </div>
         </div>
       </div>
 
@@ -219,7 +235,7 @@
           <span>&larr;</span>
           BACK
         </button>
-        <button id="generate-plan-btn" class="btn btn-primary">
+        <button id="generate-plan-btn" class="btn btn-primary" disabled>
           GENERATE PLAN
           <span>&rarr;</span>
         </button>
@@ -232,7 +248,7 @@
         <!-- Spreadsheet will be rendered here by spreadsheet.js -->
       </div>
       <div class="step-actions">
-        <button id="back-to-chat" class="btn btn-secondary">
+        <button id="back-to-competitions" class="btn btn-secondary">
           <span>&larr;</span>
           BACK
         </button>

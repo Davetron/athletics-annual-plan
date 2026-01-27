@@ -146,37 +146,48 @@ async def search_competitions(request: SearchCompetitionsRequest):
     start_year = int(request.season_year.split("/")[0])
     end_year = int(request.season_year.split("/")[1])
 
-    # Build the search prompt
-    european_text = ""
-    if request.include_european:
-        if request.athlete_type == "Masters":
-            european_text = """
-- European Masters Indoor Championships
-- European Masters Outdoor Championships (if applicable)"""
-        elif request.athlete_type == "Senior":
-            european_text = """
-- European Indoor Championships
-- European Outdoor Championships"""
+    # Build age groups text
+    age_groups_text = ", ".join(request.age_groups)
+    is_masters = "Masters" in request.age_groups
 
-    world_text = ""
-    if request.include_world and request.athlete_type == "Masters":
-        world_text = "\n- World Masters Athletics Championships"
+    # Build competition levels requirements
+    comp_requirements = []
+    if "National" in request.comp_levels:
+        comp_requirements.append(f"- National Indoor Championships (typically Jan-Mar {end_year})")
+        comp_requirements.append(f"- National Outdoor Championships (typically Jun-Aug {end_year})")
+        comp_requirements.append("- Regional/Provincial Championships")
+    if "European" in request.comp_levels:
+        if is_masters:
+            comp_requirements.append("- European Masters Indoor Championships")
+            comp_requirements.append("- European Masters Outdoor Championships")
+        else:
+            comp_requirements.append("- European Indoor Championships (if applicable)")
+            comp_requirements.append("- European Outdoor Championships (if applicable)")
+    if "World" in request.comp_levels:
+        if is_masters:
+            comp_requirements.append("- World Masters Athletics Championships")
+        else:
+            comp_requirements.append("- World Indoor Championships (if applicable)")
+            comp_requirements.append("- World Outdoor Championships (if applicable)")
+    if "Leagues" in request.comp_levels:
+        comp_requirements.append("- National League events")
+        comp_requirements.append("- Graded meets or open competitions")
+
+    comp_list = "\n".join(comp_requirements) if comp_requirements else "- National Championships"
+
+    # Federation URL hint
+    federation_hint = ""
+    if request.federation_url:
+        federation_hint = f"\n\nStart by checking the official fixtures at: {request.federation_url}"
 
     prompt = f"""Search for track and field athletics competitions for the {request.season_year} season in {request.country}.
 
-I need competitions for {request.athlete_type} athletes, specifically:
+I need competitions suitable for {age_groups_text} athletes in {request.event_group} events.
 
-- National Indoor Championships (typically Jan-Mar {end_year})
-- National Outdoor Championships (typically Jun-Aug {end_year}){european_text}{world_text}
+Competitions to find:
+{comp_list}{federation_hint}
 
-Also search for:
-- Regional/Provincial Championships
-- National League events
-- Graded meets or open competitions
-
-For {request.country}, check the national athletics federation website for fixtures.
-
-Return the competitions as a JSON array with this format:
+Return the competitions as a JSON array sorted by date, with this format:
 ```json
 [
   {{
@@ -194,6 +205,8 @@ Importance levels:
 - 1 = Major championship (Nationals, Europeans, Worlds)
 - 2 = Significant (Regional championships, major leagues)
 - 3 = Development (Graded meets, open competitions)
+
+Type should be "indoor" or "outdoor".
 
 Only return the JSON array, no other text."""
 

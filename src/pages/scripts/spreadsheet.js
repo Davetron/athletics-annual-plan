@@ -25,6 +25,16 @@ const IMPORTANCE_COLORS = {
   3: '#3498DB',
 };
 
+const INTENSITY_COLORS = {
+  4: '#E74C3C',  // High - red
+  3: '#F39C12',  // Moderate - orange
+  2: '#F1C40F',  // Low - yellow
+  1: '#2ECC71',  // Recovery - green
+  0: '#ECF0F1',  // Off - light gray
+};
+
+const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
 /**
  * SpreadsheetManager - Simple read-only preview
  */
@@ -95,7 +105,7 @@ export class SpreadsheetManager {
 
   buildTable() {
     const table = document.createElement('table');
-    table.className = 'plan-table';
+    table.className = 'plan-table plan-table-detailed';
 
     const weeks = this.plan.weeks;
 
@@ -119,31 +129,34 @@ export class SpreadsheetManager {
 
     const tbody = document.createElement('tbody');
 
-    // Month row
+    // Month row (merged)
     tbody.appendChild(this.createMergedRow('Month', weeks, w => w.month, '#1ABC9C'));
 
     // Date row
     tbody.appendChild(this.createDataRow('Date', weeks, w => this.formatDate(w.startDate)));
 
-    // Competition row
+    // Phase row (merged, full name)
+    tbody.appendChild(this.createMergedRow('Phase', weeks, w => w.phase, null, w => PHASE_COLORS[w.phaseType]));
+
+    // Block row (merged)
+    tbody.appendChild(this.createMergedRow('Block', weeks, w => w.block, '#5B9BD5'));
+
+    // Load row (color-coded)
+    tbody.appendChild(this.createDataRow('Load', weeks, w => w.load, null, w => LOAD_COLORS[w.load]));
+
+    // Daily intensity row (visual pattern)
+    tbody.appendChild(this.createDailyIntensityRow(weeks));
+
+    // Competition row (color-coded by importance)
     tbody.appendChild(this.createDataRow('Competition', weeks, w => w.competitions?.join(', ') || '', null, w => {
       if (w.competitionImportance) return IMPORTANCE_COLORS[w.competitionImportance];
       return null;
     }));
 
-    // Phase row
-    tbody.appendChild(this.createDataRow('Phase', weeks, w => this.getPhaseAbbrev(w.phaseType), null, w => PHASE_COLORS[w.phaseType]));
-
-    // Block row
-    tbody.appendChild(this.createMergedRow('Block', weeks, w => w.block, '#B4C6E7'));
-
-    // Load row
-    tbody.appendChild(this.createDataRow('Load', weeks, w => w.load, null, w => LOAD_COLORS[w.load]));
-
-    // Technical row
+    // Technical focus row
     tbody.appendChild(this.createDataRow('Technical', weeks, w => w.technical || ''));
 
-    // Physical row
+    // Physical focus row
     tbody.appendChild(this.createDataRow('Physical', weeks, w => w.physical || ''));
 
     table.appendChild(tbody);
@@ -175,8 +188,9 @@ export class SpreadsheetManager {
     return row;
   }
 
-  createMergedRow(label, weeks, getValue, bgColor) {
+  createMergedRow(label, weeks, getValue, bgColor, getBg = null) {
     const row = document.createElement('tr');
+    row.className = 'merged-row';
 
     const labelCell = document.createElement('td');
     labelCell.className = 'label-cell';
@@ -195,14 +209,56 @@ export class SpreadsheetManager {
       const td = document.createElement('td');
       td.colSpan = span;
       td.textContent = value || '';
-      td.style.background = bgColor;
-      td.style.color = 'white';
+
+      // Use dynamic background if provided, otherwise use static bgColor
+      const bg = getBg ? getBg(weeks[i]) : bgColor;
+      if (bg) {
+        td.style.background = bg;
+        td.style.color = 'white';
+      }
       td.style.fontWeight = 'bold';
       td.style.textAlign = 'center';
       row.appendChild(td);
 
       i += span;
     }
+
+    return row;
+  }
+
+  createDailyIntensityRow(weeks) {
+    const row = document.createElement('tr');
+    row.className = 'daily-intensity-row';
+
+    const labelCell = document.createElement('td');
+    labelCell.className = 'label-cell';
+    labelCell.textContent = 'Daily';
+    row.appendChild(labelCell);
+
+    weeks.forEach(week => {
+      const td = document.createElement('td');
+      td.className = 'daily-intensity-cell';
+
+      if (week.dailyIntensity && week.dailyIntensity.length === 7) {
+        const container = document.createElement('div');
+        container.className = 'intensity-dots';
+
+        week.dailyIntensity.forEach((intensity, dayIdx) => {
+          const dot = document.createElement('span');
+          dot.className = 'intensity-dot';
+          dot.style.background = INTENSITY_COLORS[intensity] || INTENSITY_COLORS[0];
+          dot.title = `${DAY_LABELS[dayIdx]}: ${['Off', 'Recovery', 'Low', 'Moderate', 'High'][intensity] || 'Off'}`;
+          container.appendChild(dot);
+        });
+
+        td.appendChild(container);
+      } else {
+        td.textContent = '-';
+        td.style.color = 'var(--text-muted)';
+      }
+
+      row.appendChild(td);
+    });
 
     return row;
   }
