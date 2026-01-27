@@ -1,0 +1,11 @@
+# Dependencies
+node_modules/
+python_modules/
+.venv/
+.venv-workers/
+
+# Wrangler cache
+.wrangler/
+
+# Local env (symlinked)
+.dev.vars

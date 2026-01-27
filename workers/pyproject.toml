@@ -1,0 +1,9 @@
+[project]
+name = "athletics-annual-plan-api"
+version = "1.0.0"
+description = "Python Worker API for athletics training plan generation"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx",
+    "openpyxl",
+]

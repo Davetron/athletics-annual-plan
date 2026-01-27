@@ -1,0 +1,11 @@
+# Python Worker configuration for Athletics Annual Plan API
+name = "athletics-annual-plan-api"
+main = "src/worker.py"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["python_workers"]
+
+[vars]
+CORS_ORIGIN = "https://athletics-annual-plan.pages.dev"
+
+# Secrets (set via: npx wrangler secret put CLAUDE_API_KEY)
+# CLAUDE_API_KEY = "sk-..."
