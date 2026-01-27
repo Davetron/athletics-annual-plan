@@ -147,6 +147,39 @@ class App {
     this.generationModal = document.getElementById('generation-modal');
     this.generationStatus = document.getElementById('generation-status');
     this.searchStatusText = this.competitionsLoading.querySelector('p');
+
+    // Season select
+    this.seasonSelect = document.getElementById('season');
+    this.populateSeasonOptions();
+  }
+
+  /**
+   * Populate season dropdown with current and next season.
+   * Athletics seasons run Sept-Aug, so "2025/2026" starts Sept 2025.
+   */
+  populateSeasonOptions() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth(); // 0-indexed (0 = Jan, 8 = Sept)
+
+    // If Sept or later, current season is year/(year+1)
+    // Otherwise, current season is (year-1)/year
+    const currentSeasonStart = month >= 8 ? year : year - 1;
+
+    const seasons = [
+      `${currentSeasonStart}/${currentSeasonStart + 1}`,
+      `${currentSeasonStart + 1}/${currentSeasonStart + 2}`
+    ];
+
+    // Clear existing options and add new ones
+    this.seasonSelect.textContent = '';
+    seasons.forEach((season, i) => {
+      const option = document.createElement('option');
+      option.value = season;
+      option.textContent = season;
+      if (i === 0) option.selected = true;
+      this.seasonSelect.appendChild(option);
+    });
   }
 
   /**
