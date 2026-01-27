@@ -101,10 +101,10 @@
   </main>
 
   <script>
-    // API base URL - points to Python backend in development
+    // API base URL - points to Python backend in development, Cloudflare Worker in production
     const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
       ? 'http://localhost:8000'
-      : '';
+      : 'https://athletics-annual-plan-api.dave-connolly.workers.dev';
 
     const form = document.getElementById('invite-form');
     const input = document.getElementById('invite-code');
