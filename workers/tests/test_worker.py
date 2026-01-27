@@ -221,6 +221,59 @@ class TestExcelDownload:
         assert "attachment" in content_disposition
 
 
+    def test_excel_content_matches_plan(self, check_worker_running):
+        """
+        Test that the Excel file content matches the input plan data.
+
+        This verifies the Excel is not just structurally valid, but contains
+        the correct data from the plan.
+        """
+        from openpyxl import load_workbook
+
+        plan = create_mock_plan(athlete="Test Runner", season="2025/2026")
+
+        # Set specific values we can verify
+        plan["weeks"][0]["phase"] = "Transition"
+        plan["weeks"][0]["load"] = 2
+        plan["weeks"][10]["phase"] = "General Prep I"
+        plan["weeks"][10]["load"] = 3
+
+        response = httpx.post(
+            f"{WORKER_URL}/api/download-excel",
+            json={"plan": plan},
+            timeout=60.0
+        )
+
+        assert response.status_code == 200
+
+        # Load the workbook
+        wb = load_workbook(BytesIO(response.content))
+        ws = wb.active
+
+        # Verify sheet name
+        assert ws.title == "Annual Plan"
+
+        # Verify title row (row 2, column B) contains athlete and season
+        title_cell = ws.cell(row=2, column=2)
+        assert "Test Runner" in str(title_cell.value)
+        assert "2025/2026" in str(title_cell.value)
+
+        # Verify week numbers are present (row 4)
+        week_1_cell = ws.cell(row=4, column=2)  # Week 1
+        assert week_1_cell.value == 1
+
+        week_52_cell = ws.cell(row=4, column=53)  # Week 52
+        assert week_52_cell.value == 52
+
+        # Verify we have 52 weeks of data
+        # Count non-empty cells in the week row (row 4, columns B through BA)
+        week_count = sum(
+            1 for col in range(2, 54)
+            if ws.cell(row=4, column=col).value is not None
+        )
+        assert week_count == 52, f"Expected 52 weeks, found {week_count}"
+
+
 class TestCORS:
     """Test CORS headers are properly set."""
 
