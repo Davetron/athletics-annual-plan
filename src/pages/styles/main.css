@@ -1911,6 +1911,63 @@ body {
 }
 
 /* ============================================
+   PLAN GENERATION MODAL
+   ============================================ */
+
+.generation-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+}
+
+.generation-modal.active {
+  display: flex;
+}
+
+.generation-modal-content {
+  text-align: center;
+  padding: var(--space-2xl);
+}
+
+/* Animated track with running figure */
+.generation-track {
+  width: 200px;
+  height: 4px;
+  background: var(--surface-elevated);
+  border-radius: 2px;
+  margin: 0 auto var(--space-xl);
+  position: relative;
+  overflow: hidden;
+}
+
+.generation-runner {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  background: var(--accent-gold);
+  border-radius: 50%;
+  top: -10px;
+  animation: run-track 2s ease-in-out infinite;
+}
+
+@keyframes run-track {
+  0%, 100% { left: 0; }
+  50% { left: calc(100% - 24px); }
+}
+
+.generation-status {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  color: var(--accent-gold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* ============================================
    RESPONSIVE
    ============================================ */
 

@@ -6,6 +6,73 @@
 import { SpreadsheetManager } from './spreadsheet.js';
 import { API_BASE } from './config.js';
 
+// Athletics-themed status messages for loading states
+const searchStatusMessages = [
+  // Warm-up sequence
+  "Doing warm-up jog...",
+  "Mobilising joints...",
+  "Activating hamstrings...",
+  "Dynamic stretching...",
+  "Foam rolling quads...",
+  "Firing up the glutes...",
+  "High knees down the straight...",
+  "Leg swings at the fence...",
+  "A-skips and B-skips...",
+  "Striders on the back straight...",
+  "Shaking out the legs...",
+  // Track preparation
+  "Putting out cones...",
+  "Checking the track conditions...",
+  "Checking the wind gauge...",
+  "Marking out the blocks...",
+  "Adjusting block spacing...",
+  "Chalking the hands...",
+  // Race prep
+  "Studying the heat sheet...",
+  "Checking lane assignments...",
+  "Removing the tracksuit...",
+  "One more practice start...",
+  "Bouncing on the balls of feet...",
+  "Deep breaths at the line...",
+  // Search specific
+  "Scanning competition calendars...",
+  "Surveying the fixture list...",
+  "Cross-referencing championships...",
+  "Finding your target races...",
+  "Checking entry standards...",
+  "Mapping the competition circuit..."
+];
+
+const planStatusMessages = [
+  // Pre-race
+  "Lacing up spikes...",
+  "Settling into the blocks...",
+  "Listening for the gun...",
+  "Visualising the race...",
+  "SET...",
+  // Race execution
+  "Exploding from the blocks...",
+  "Driving through the first 30m...",
+  "Transition to upright...",
+  "Hitting maximum velocity...",
+  "Maintaining form down the straight...",
+  "Pumping arms, staying relaxed...",
+  "Leaning for the line...",
+  // Planning specific
+  "Mapping your periodization...",
+  "Structuring the macrocycle...",
+  "Building base phases...",
+  "Programming speed work...",
+  "Adding tempo sessions...",
+  "Balancing volume and intensity...",
+  "Scheduling recovery weeks...",
+  "Planning deload weeks...",
+  "Penciling in competition dates...",
+  "Calculating training load...",
+  "Fine-tuning the taper...",
+  "Finalising your 52-week plan..."
+];
+
 // Federation data for URL lookup
 const FEDERATIONS = {
   'Ireland': 'https://www.athleticsireland.ie/competition/fixtures',
@@ -75,6 +142,11 @@ class App {
 
     // Spreadsheet container
     this.spreadsheetContainer = document.getElementById('spreadsheet-container');
+
+    // Generation modal elements
+    this.generationModal = document.getElementById('generation-modal');
+    this.generationStatus = document.getElementById('generation-status');
+    this.searchStatusText = this.competitionsLoading.querySelector('p');
   }
 
   /**
@@ -128,6 +200,31 @@ class App {
   }
 
   /**
+   * Start cycling through status messages on an element
+   * @param {HTMLElement} element - The element to update text content
+   * @param {string[]} messages - Array of messages to cycle through
+   * @param {number} intervalMs - Interval between messages (default 2500ms)
+   * @returns {number} - Interval ID for cleanup
+   */
+  startStatusCycle(element, messages, intervalMs = 2500) {
+    let index = 0;
+    element.textContent = messages[0];
+
+    return setInterval(() => {
+      index = (index + 1) % messages.length;
+      element.textContent = messages[index];
+    }, intervalMs);
+  }
+
+  /**
+   * Stop a status cycle
+   * @param {number} intervalId - The interval ID to clear
+   */
+  stopStatusCycle(intervalId) {
+    if (intervalId) clearInterval(intervalId);
+  }
+
+  /**
    * Search for competitions based on form data
    */
   async searchCompetitions() {
@@ -139,6 +236,12 @@ class App {
     this.generatePlanBtn.disabled = true;
 
     this.competitionsSubtitle.textContent = `Searching competitions for ${this.formData.season} season...`;
+
+    // Start cycling through search status messages
+    this.searchStatusInterval = this.startStatusCycle(
+      this.searchStatusText,
+      searchStatusMessages
+    );
 
     try {
       const federationUrl = FEDERATIONS[this.formData.country] || null;
@@ -158,6 +261,9 @@ class App {
 
       const data = await response.json();
 
+      // Stop status cycling
+      this.stopStatusCycle(this.searchStatusInterval);
+
       if (!data.success) {
         throw new Error(data.error || 'Failed to search competitions');
       }
@@ -174,6 +280,8 @@ class App {
 
       this.renderCompetitions();
     } catch (error) {
+      // Stop status cycling on error
+      this.stopStatusCycle(this.searchStatusInterval);
       console.error('Competition search error:', error);
       this.showCompetitionError(error.message);
     }
@@ -398,6 +506,13 @@ class App {
     this.generatePlanBtn.disabled = true;
     this.generatePlanBtn.textContent = 'GENERATING...';
 
+    // Show generation modal with status cycling
+    this.generationModal.classList.add('active');
+    this.planStatusInterval = this.startStatusCycle(
+      this.generationStatus,
+      planStatusMessages
+    );
+
     try {
       // Build target competitions string from selected
       const selectedComps = this.selectedCompetitions.map(i => this.allCompetitions[i]);
@@ -424,6 +539,10 @@ class App {
 
       const data = await response.json();
 
+      // Hide modal and stop status cycling
+      this.stopStatusCycle(this.planStatusInterval);
+      this.generationModal.classList.remove('active');
+
       if (!data.success) {
         throw new Error(data.error || 'Failed to generate plan');
       }
@@ -432,6 +551,9 @@ class App {
       this.initSpreadsheet(this.plan);
       this.goToStep(3);
     } catch (error) {
+      // Hide modal and stop status cycling on error
+      this.stopStatusCycle(this.planStatusInterval);
+      this.generationModal.classList.remove('active');
       console.error('Generate plan error:', error);
       alert(`Failed to generate plan: ${error.message}`);
     } finally {
