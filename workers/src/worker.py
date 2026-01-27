@@ -3,7 +3,7 @@ Cloudflare Workers entry point - minimal implementation without FastAPI.
 Uses JS APIs directly to avoid startup CPU limits.
 """
 
-from js import Response, JSON, Object, Headers
+from js import Response, JSON, Object, Headers, Uint8Array
 import json
 
 
@@ -171,7 +171,11 @@ async def handle_download_excel(request, cors_headers):
         for k, v in cors_headers.items():
             headers.set(k, v)
 
-        return Response.new(output.getvalue(), headers=headers)
+        # Convert Python bytes to JavaScript Uint8Array for proper binary response
+        excel_bytes = output.getvalue()
+        js_array = Uint8Array.new(list(excel_bytes))
+
+        return Response.new(js_array, headers=headers)
 
     except Exception as e:
         return json_response({"error": f"Failed to generate Excel file: {str(e)}"}, cors_headers, 500)
