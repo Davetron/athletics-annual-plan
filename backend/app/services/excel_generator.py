@@ -70,27 +70,11 @@ ROWS = {
     "physical": 15,
     "psychological": 16,
     "microcycles": 17,
-    "block": 18,
-    "load_label": 19,
-    "load": 20,
-    "daily_label": 21,
-    "daily_mon": 22,
-    "daily_tue": 23,
-    "daily_wed": 24,
-    "daily_thu": 25,
-    "daily_fri": 26,
-    "daily_sat": 27,
-    "daily_sun": 28,
-}
-
-DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-
-INTENSITY_COLORS = {
-    4: COLORS["load_4"],  # High - red
-    3: COLORS["load_3"],  # Moderate - orange
-    2: COLORS["load_2"],  # Low - yellow
-    1: COLORS["load_1"],  # Recovery - green
-    0: COLORS["load_0"],  # Off - light gray
+    "block_name": 18,  # Block names row (merged cells)
+    "block_intensity_4": 19,  # Intensity level 4 (red)
+    "block_intensity_3": 20,  # Intensity level 3 (orange)
+    "block_intensity_2": 21,  # Intensity level 2 (yellow)
+    "block_intensity_1": 22,  # Intensity level 1 (green)
 }
 
 DATA_START_COL = 2  # Column B
@@ -135,17 +119,11 @@ def generate_excel_from_plan(plan: dict) -> Workbook:
     # Add phases with colors
     _add_phases(ws, weeks)
 
-    # Add training blocks
+    # Add training blocks (includes intensity visualization)
     _add_blocks(ws, weeks)
 
     # Add focus areas
     _add_focus_areas(ws, weeks)
-
-    # Add training load
-    _add_training_load(ws, weeks)
-
-    # Add daily intensity
-    _add_daily_intensity(ws, weeks)
 
     # Apply borders
     _apply_borders(ws, weeks)
@@ -176,17 +154,11 @@ def _add_row_labels(ws):
         ROWS["physical"]: "Physical",
         ROWS["psychological"]: "Psychological",
         ROWS["microcycles"]: "Microcycles",
-        ROWS["block"]: "Block",
-        ROWS["load_label"]: "Training Load",
-        ROWS["load"]: "",
-        ROWS["daily_label"]: "Daily Intensity",
-        ROWS["daily_mon"]: "Mon",
-        ROWS["daily_tue"]: "Tue",
-        ROWS["daily_wed"]: "Wed",
-        ROWS["daily_thu"]: "Thu",
-        ROWS["daily_fri"]: "Fri",
-        ROWS["daily_sat"]: "Sat",
-        ROWS["daily_sun"]: "Sun",
+        ROWS["block_name"]: "Block",
+        ROWS["block_intensity_4"]: "",
+        ROWS["block_intensity_3"]: "",
+        ROWS["block_intensity_2"]: "",
+        ROWS["block_intensity_1"]: "",
     }
 
     for row, label in labels.items():
@@ -195,6 +167,19 @@ def _add_row_labels(ws):
         cell.font = Font(bold=True, size=10)
         cell.alignment = Alignment(vertical="center")
         cell.fill = COLORS["light_grey"]
+
+    # Merge and label the Weekly Load section (intensity rows)
+    ws.merge_cells(
+        start_row=ROWS["block_intensity_4"],
+        start_column=1,
+        end_row=ROWS["block_intensity_1"],
+        end_column=1,
+    )
+    weekly_load_cell = ws.cell(row=ROWS["block_intensity_4"], column=1)
+    weekly_load_cell.value = "Weekly Load"
+    weekly_load_cell.font = Font(bold=True, size=10)
+    weekly_load_cell.alignment = Alignment(vertical="center", horizontal="center")
+    weekly_load_cell.fill = COLORS["light_grey"]
 
 
 def _add_title_row(ws, plan: dict):
@@ -386,10 +371,17 @@ def _add_phases(ws, weeks: list):
 
 
 def _add_blocks(ws, weeks: list):
-    """Add training blocks."""
+    """Add training blocks with intensity visualization.
+
+    Creates a block section with:
+    - Top row: Block names (merged cells, light blue background)
+    - 4 rows below: Intensity levels (4, 3, 2, 1) showing weekly load
+      in a stacked bar style visualization
+    """
     current_block = None
     block_start_col = DATA_START_COL
 
+    # First pass: Add block name headers (merged cells)
     for i, week in enumerate(weeks):
         col = DATA_START_COL + i
         block_name = week.get("block", "")
@@ -398,18 +390,18 @@ def _add_blocks(ws, weeks: list):
             # Merge previous block cells
             if current_block is not None and col > block_start_col:
                 for c in range(block_start_col, col):
-                    block_cell = ws.cell(row=ROWS["block"], column=c)
+                    block_cell = ws.cell(row=ROWS["block_name"], column=c)
                     block_cell.fill = COLORS["light_blue"]
 
                 if col - block_start_col > 1:
                     ws.merge_cells(
-                        start_row=ROWS["block"],
+                        start_row=ROWS["block_name"],
                         start_column=block_start_col,
-                        end_row=ROWS["block"],
+                        end_row=ROWS["block_name"],
                         end_column=col - 1,
                     )
 
-                cell = ws.cell(row=ROWS["block"], column=block_start_col)
+                cell = ws.cell(row=ROWS["block_name"], column=block_start_col)
                 cell.value = current_block
                 cell.alignment = Alignment(horizontal="center", vertical="center")
                 cell.font = Font(bold=True)
@@ -417,25 +409,47 @@ def _add_blocks(ws, weeks: list):
             current_block = block_name
             block_start_col = col
 
-    # Handle last block
+    # Handle last block name
     if current_block is not None:
         end_col = DATA_START_COL + len(weeks) - 1
         for c in range(block_start_col, end_col + 1):
-            block_cell = ws.cell(row=ROWS["block"], column=c)
+            block_cell = ws.cell(row=ROWS["block_name"], column=c)
             block_cell.fill = COLORS["light_blue"]
 
         if end_col > block_start_col:
             ws.merge_cells(
-                start_row=ROWS["block"],
+                start_row=ROWS["block_name"],
                 start_column=block_start_col,
-                end_row=ROWS["block"],
+                end_row=ROWS["block_name"],
                 end_column=end_col,
             )
 
-        cell = ws.cell(row=ROWS["block"], column=block_start_col)
+        cell = ws.cell(row=ROWS["block_name"], column=block_start_col)
         cell.value = current_block
         cell.alignment = Alignment(horizontal="center", vertical="center")
         cell.font = Font(bold=True)
+
+    # Second pass: Add intensity visualization rows (stacked bar style)
+    # Map intensity level to its corresponding row
+    intensity_rows = {
+        4: ROWS["block_intensity_4"],
+        3: ROWS["block_intensity_3"],
+        2: ROWS["block_intensity_2"],
+        1: ROWS["block_intensity_1"],
+    }
+
+    for i, week in enumerate(weeks):
+        col = DATA_START_COL + i
+        load = week.get("load", 2)  # Default to load 2 if not specified
+
+        # Only display intensity if it's 1-4
+        if load in intensity_rows:
+            intensity_row = intensity_rows[load]
+            cell = ws.cell(row=intensity_row, column=col)
+            cell.value = load
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.font = Font(bold=True)
+            cell.fill = LOAD_COLORS.get(load, COLORS["load_2"])
 
 
 def _add_focus_areas(ws, weeks: list):
@@ -464,59 +478,6 @@ def _add_focus_areas(ws, weeks: list):
             phys_cell.font = Font(size=9)
 
 
-def _add_training_load(ws, weeks: list):
-    """Add training load with color coding."""
-    for i, week in enumerate(weeks):
-        col = DATA_START_COL + i
-        load = week.get("load", 2)
-
-        load_cell = ws.cell(row=ROWS["load"], column=col)
-        load_cell.value = load
-        load_cell.alignment = Alignment(horizontal="center", vertical="center")
-        load_cell.font = Font(bold=True)
-        load_cell.fill = LOAD_COLORS.get(load, COLORS["load_2"])
-
-
-def _add_daily_intensity(ws, weeks: list):
-    """Add daily intensity pattern with color coding for each day of the week."""
-    day_rows = [
-        ROWS["daily_mon"],
-        ROWS["daily_tue"],
-        ROWS["daily_wed"],
-        ROWS["daily_thu"],
-        ROWS["daily_fri"],
-        ROWS["daily_sat"],
-        ROWS["daily_sun"],
-    ]
-
-    for i, week in enumerate(weeks):
-        col = DATA_START_COL + i
-        daily_intensity = week.get("dailyIntensity", [])
-
-        # If no daily intensity data, use default based on weekly load
-        if not daily_intensity or len(daily_intensity) != 7:
-            load = week.get("load", 2)
-            # Default patterns based on weekly load
-            default_patterns = {
-                4: [3, 4, 1, 3, 4, 2, 0],  # Peak week
-                3: [2, 3, 1, 3, 2, 1, 0],  # Build week
-                2: [2, 2, 1, 2, 2, 1, 0],  # Base week
-                1: [1, 2, 0, 1, 2, 0, 0],  # Recovery week
-                0: [0, 1, 0, 1, 0, 0, 0],  # Off week
-            }
-            daily_intensity = default_patterns.get(load, default_patterns[2])
-
-        # Fill in each day's intensity
-        for day_idx, day_row in enumerate(day_rows):
-            intensity = daily_intensity[day_idx] if day_idx < len(daily_intensity) else 0
-
-            cell = ws.cell(row=day_row, column=col)
-            cell.value = intensity
-            cell.alignment = Alignment(horizontal="center", vertical="center")
-            cell.font = Font(size=9)
-            cell.fill = INTENSITY_COLORS.get(intensity, COLORS["load_0"])
-
-
 def _apply_borders(ws, weeks: list):
     """Apply borders to the worksheet."""
     end_col = DATA_START_COL + len(weeks) - 1
@@ -527,8 +488,8 @@ def _apply_borders(ws, weeks: list):
         right=Side(style="thin", color="D0D0D0"),
     )
 
-    # Apply borders to all data cells (including daily intensity rows)
-    for row in range(ROWS["month"], ROWS["daily_sun"] + 1):
+    # Apply borders to all data cells
+    for row in range(ROWS["month"], ROWS["block_intensity_1"] + 1):
         for col in range(1, end_col + 1):
             cell = ws.cell(row=row, column=col)
             cell.border = thin_border
@@ -549,3 +510,19 @@ def _apply_borders(ws, weeks: list):
                     right=thin_border.right,
                 )
         current_month = week.get("month")
+
+    # Add thicker borders between blocks
+    current_block = None
+    for i, week in enumerate(weeks):
+        col = DATA_START_COL + i
+        if week.get("block") != current_block and current_block is not None:
+            # Add thick left border for block and weekly load rows
+            for row in range(ROWS["block_name"], ROWS["block_intensity_1"] + 1):
+                cell = ws.cell(row=row, column=col)
+                cell.border = Border(
+                    top=thin_border.top,
+                    left=thick_left,
+                    bottom=thin_border.bottom,
+                    right=thin_border.right,
+                )
+        current_block = week.get("block")

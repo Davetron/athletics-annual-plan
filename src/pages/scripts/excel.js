@@ -43,9 +43,11 @@ const ROWS = {
   physical: 15,
   psychological: 16,
   microcycles: 17,
-  block: 18,
-  loadLabel: 19,
-  load: 20,
+  blockName: 18,        // Block names row (merged cells)
+  blockIntensity4: 19,  // Intensity level 4 (red)
+  blockIntensity3: 20,  // Intensity level 3 (orange)
+  blockIntensity2: 21,  // Intensity level 2 (yellow)
+  blockIntensity1: 22,  // Intensity level 1 (green)
 };
 
 const DATA_START_COL = 2; // Column B (1-indexed)
@@ -86,14 +88,11 @@ export async function generateExcel(plan) {
   // Add phases with colors
   addPhases(ws, plan);
 
-  // Add training blocks
+  // Add training blocks (includes intensity visualization)
   addBlocks(ws, plan);
 
   // Add focus areas (technical, physical, etc.)
   addFocusAreas(ws, plan);
-
-  // Add training load
-  addTrainingLoad(ws, plan);
 
   // Apply consistent borders
   applyBorders(ws, plan);
@@ -126,9 +125,11 @@ function addRowLabels(ws) {
     [ROWS.physical]: 'Physical',
     [ROWS.psychological]: 'Psychological',
     [ROWS.microcycles]: 'Microcycles',
-    [ROWS.block]: 'Block',
-    [ROWS.loadLabel]: 'Training Load',
-    [ROWS.load]: '',
+    [ROWS.blockName]: 'Block',
+    [ROWS.blockIntensity4]: '',
+    [ROWS.blockIntensity3]: '',
+    [ROWS.blockIntensity2]: '',
+    [ROWS.blockIntensity1]: '',
   };
 
   for (const [row, label] of Object.entries(labels)) {
@@ -369,13 +370,18 @@ function addPhases(ws, plan) {
 }
 
 /**
- * Add training blocks
+ * Add training blocks with intensity visualization.
+ * Creates a block section with:
+ * - Top row: Block names (merged cells, light blue background)
+ * - 4 rows below: Intensity levels (4, 3, 2, 1) showing weekly load
+ *   in a stacked bar style visualization
  */
 function addBlocks(ws, plan) {
   const weeks = plan.weeks || [];
   let currentBlock = null;
   let blockStartCol = DATA_START_COL;
 
+  // First pass: Add block name headers (merged cells)
   for (let i = 0; i < weeks.length; i++) {
     const week = weeks[i];
     const col = DATA_START_COL + i;
@@ -385,7 +391,7 @@ function addBlocks(ws, plan) {
       // Merge previous block cells
       if (currentBlock !== null && col > blockStartCol) {
         for (let c = blockStartCol; c < col; c++) {
-          const blockCell = ws.getCell(ROWS.block, c);
+          const blockCell = ws.getCell(ROWS.blockName, c);
           blockCell.fill = {
             type: 'pattern',
             pattern: 'solid',
@@ -394,22 +400,22 @@ function addBlocks(ws, plan) {
         }
 
         if (col - blockStartCol > 1) {
-          ws.mergeCells(ROWS.block, blockStartCol, ROWS.block, col - 1);
+          ws.mergeCells(ROWS.blockName, blockStartCol, ROWS.blockName, col - 1);
         }
-        ws.getCell(ROWS.block, blockStartCol).value = currentBlock;
-        ws.getCell(ROWS.block, blockStartCol).alignment = { horizontal: 'center', vertical: 'middle' };
-        ws.getCell(ROWS.block, blockStartCol).font = { bold: true };
+        ws.getCell(ROWS.blockName, blockStartCol).value = currentBlock;
+        ws.getCell(ROWS.blockName, blockStartCol).alignment = { horizontal: 'center', vertical: 'middle' };
+        ws.getCell(ROWS.blockName, blockStartCol).font = { bold: true };
       }
       currentBlock = blockName;
       blockStartCol = col;
     }
   }
 
-  // Handle last block
+  // Handle last block name
   if (currentBlock !== null) {
     const endCol = DATA_START_COL + weeks.length - 1;
     for (let c = blockStartCol; c <= endCol; c++) {
-      const blockCell = ws.getCell(ROWS.block, c);
+      const blockCell = ws.getCell(ROWS.blockName, c);
       blockCell.fill = {
         type: 'pattern',
         pattern: 'solid',
@@ -418,11 +424,47 @@ function addBlocks(ws, plan) {
     }
 
     if (endCol > blockStartCol) {
-      ws.mergeCells(ROWS.block, blockStartCol, ROWS.block, endCol);
+      ws.mergeCells(ROWS.blockName, blockStartCol, ROWS.blockName, endCol);
     }
-    ws.getCell(ROWS.block, blockStartCol).value = currentBlock;
-    ws.getCell(ROWS.block, blockStartCol).alignment = { horizontal: 'center', vertical: 'middle' };
-    ws.getCell(ROWS.block, blockStartCol).font = { bold: true };
+    ws.getCell(ROWS.blockName, blockStartCol).value = currentBlock;
+    ws.getCell(ROWS.blockName, blockStartCol).alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getCell(ROWS.blockName, blockStartCol).font = { bold: true };
+  }
+
+  // Second pass: Add intensity visualization rows (stacked bar style)
+  // Map intensity level to its corresponding row
+  const intensityRows = {
+    4: ROWS.blockIntensity4,
+    3: ROWS.blockIntensity3,
+    2: ROWS.blockIntensity2,
+    1: ROWS.blockIntensity1,
+  };
+
+  const loadColors = {
+    4: COLORS.load4,
+    3: COLORS.load3,
+    2: COLORS.load2,
+    1: COLORS.load1,
+  };
+
+  for (let i = 0; i < weeks.length; i++) {
+    const week = weeks[i];
+    const col = DATA_START_COL + i;
+    const load = week.load ?? 2; // Default to load 2 if not specified
+
+    // Only display intensity if it's 1-4
+    if (intensityRows[load]) {
+      const intensityRow = intensityRows[load];
+      const cell = ws.getCell(intensityRow, col);
+      cell.value = load;
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.font = { bold: true };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: loadColors[load] || COLORS.load2 }
+      };
+    }
   }
 }
 
@@ -455,38 +497,6 @@ function addFocusAreas(ws, plan) {
 }
 
 /**
- * Add training load with color coding
- */
-function addTrainingLoad(ws, plan) {
-  const weeks = plan.weeks || [];
-
-  const loadColors = {
-    4: COLORS.load4,
-    3: COLORS.load3,
-    2: COLORS.load2,
-    1: COLORS.load1,
-    0: COLORS.load0,
-  };
-
-  for (let i = 0; i < weeks.length; i++) {
-    const week = weeks[i];
-    const col = DATA_START_COL + i;
-
-    const loadCell = ws.getCell(ROWS.load, col);
-    loadCell.value = week.load;
-    loadCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    loadCell.font = { bold: true };
-
-    const color = loadColors[week.load] || COLORS.load2;
-    loadCell.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: color }
-    };
-  }
-}
-
-/**
  * Apply borders to the worksheet
  */
 function applyBorders(ws, plan) {
@@ -495,8 +505,8 @@ function applyBorders(ws, plan) {
 
   const thinBorder = { style: 'thin', color: { argb: 'FFD0D0D0' } };
 
-  // Apply borders to all data cells
-  for (let row = ROWS.month; row <= ROWS.load; row++) {
+  // Apply borders to all data cells (including block intensity rows)
+  for (let row = ROWS.month; row <= ROWS.blockIntensity1; row++) {
     for (let col = 1; col <= endCol; col++) {
       const cell = ws.getCell(row, col);
       cell.border = {

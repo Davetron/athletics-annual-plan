@@ -25,16 +25,6 @@ const IMPORTANCE_COLORS = {
   3: '#3498DB',
 };
 
-const INTENSITY_COLORS = {
-  4: '#E74C3C',  // High - red
-  3: '#F39C12',  // Moderate - orange
-  2: '#F1C40F',  // Low - yellow
-  1: '#2ECC71',  // Recovery - green
-  0: '#ECF0F1',  // Off - light gray
-};
-
-const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-
 /**
  * SpreadsheetManager - Simple read-only preview
  */
@@ -138,14 +128,13 @@ export class SpreadsheetManager {
     // Phase row (merged, full name)
     tbody.appendChild(this.createMergedRow('Phase', weeks, w => w.phase, null, w => PHASE_COLORS[w.phaseType]));
 
-    // Block row (merged)
-    tbody.appendChild(this.createMergedRow('Block', weeks, w => w.block, '#5B9BD5'));
+    // Block section: name row + intensity rows
+    tbody.appendChild(this.createMergedRow('Block', weeks, w => w.block, '#B4C6E7'));
 
-    // Load row (color-coded)
-    tbody.appendChild(this.createDataRow('Load', weeks, w => w.load, null, w => LOAD_COLORS[w.load]));
-
-    // Daily intensity row (visual pattern)
-    tbody.appendChild(this.createDailyIntensityRow(weeks));
+    // Weekly Load section (stacked bar visualization)
+    [4, 3, 2, 1].forEach((level, index) => {
+      tbody.appendChild(this.createBlockIntensityRow(level, weeks, index === 0));
+    });
 
     // Competition row (color-coded by importance)
     tbody.appendChild(this.createDataRow('Competition', weeks, w => w.competitions?.join(', ') || '', null, w => {
@@ -226,37 +215,42 @@ export class SpreadsheetManager {
     return row;
   }
 
-  createDailyIntensityRow(weeks) {
+  /**
+   * Create a block intensity row for the stacked bar visualization.
+   * Shows the weekly load value only in cells where it matches the level.
+   * @param {number} level - The intensity level (1-4)
+   * @param {Array} weeks - The weeks data
+   * @param {boolean} showLabel - If true, show "Weekly Load" label with rowspan=4
+   */
+  createBlockIntensityRow(level, weeks, showLabel = false) {
     const row = document.createElement('tr');
-    row.className = 'daily-intensity-row';
+    row.className = 'block-intensity-row';
 
-    const labelCell = document.createElement('td');
-    labelCell.className = 'label-cell';
-    labelCell.textContent = 'Daily';
-    row.appendChild(labelCell);
+    // Only add label cell on first row (with rowspan)
+    if (showLabel) {
+      const labelCell = document.createElement('td');
+      labelCell.className = 'label-cell';
+      labelCell.textContent = 'Weekly Load';
+      labelCell.rowSpan = 4;
+      labelCell.style.verticalAlign = 'middle';
+      row.appendChild(labelCell);
+    }
 
     weeks.forEach(week => {
       const td = document.createElement('td');
-      td.className = 'daily-intensity-cell';
+      td.className = 'block-intensity-cell';
 
-      if (week.dailyIntensity && week.dailyIntensity.length === 7) {
-        const container = document.createElement('div');
-        container.className = 'intensity-dots';
-
-        week.dailyIntensity.forEach((intensity, dayIdx) => {
-          const dot = document.createElement('span');
-          dot.className = 'intensity-dot';
-          dot.style.background = INTENSITY_COLORS[intensity] || INTENSITY_COLORS[0];
-          dot.title = `${DAY_LABELS[dayIdx]}: ${['Off', 'Recovery', 'Low', 'Moderate', 'High'][intensity] || 'Off'}`;
-          container.appendChild(dot);
-        });
-
-        td.appendChild(container);
-      } else {
-        td.textContent = '-';
-        td.style.color = 'var(--text-muted)';
+      // Only show value if week's load matches this level
+      if (week.load === level) {
+        td.textContent = level;
+        td.style.background = LOAD_COLORS[level];
+        td.style.fontWeight = 'bold';
+        td.style.textAlign = 'center';
+        // White text for better contrast
+        if (level >= 3) {
+          td.style.color = 'white';
+        }
       }
-
       row.appendChild(td);
     });
 
