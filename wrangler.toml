@@ -4,15 +4,3 @@ compatibility_date = "2024-01-01"
 
 # Pages configuration
 pages_build_output_dir = "src/pages"
-
-# KV namespace binding
-# For local dev: uses local SQLite storage
-# For production: update 'id' after running: npx wrangler kv namespace create INVITE_CODES
-[[kv_namespaces]]
-binding = "INVITE_CODES"
-id = "local-dev-placeholder"
-
-# Environment variables
-# Set secrets with: npx wrangler pages secret put CLAUDE_API_KEY --project-name athletics-annual-plan
-[vars]
-CORS_ORIGIN = "https://athletics-annual-plan.pages.dev"
