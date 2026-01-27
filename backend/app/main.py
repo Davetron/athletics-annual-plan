@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.models.database import init_db
-from app.routers import auth, chat, plan, competitions
+from app.routers import auth, plan, competitions
 
 
 @asynccontextmanager
@@ -41,7 +41,6 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth.router, prefix="/api", tags=["auth"])
-app.include_router(chat.router, prefix="/api", tags=["chat"])
 app.include_router(plan.router, prefix="/api", tags=["plan"])
 app.include_router(competitions.router, prefix="/api", tags=["competitions"])
 

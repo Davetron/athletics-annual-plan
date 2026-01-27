@@ -71,6 +71,7 @@ async def generate_plan(
                 json={
                     "model": "claude-haiku-4-5-20251001",
                     "max_tokens": 16384,
+                    "temperature": 0,
                     "system": GENERATION_SYSTEM_PROMPT,
                     "tools": [GENERATE_PLAN_TOOL],
                     "tool_choice": {"type": "tool", "name": "generate_annual_plan"},

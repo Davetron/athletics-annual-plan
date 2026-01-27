@@ -24,27 +24,12 @@ class ValidateCodeResponse(BaseModel):
     error: str | None = None
 
 
-# Chat schemas
+# Message schema (used by plan generation)
 class ChatMessage(BaseModel):
     """A single chat message."""
 
     role: str = Field(..., pattern="^(user|assistant)$")
     content: str
-
-
-class ChatRequest(BaseModel):
-    """Request to chat with Claude."""
-
-    system: str | None = None
-    messages: list[ChatMessage]
-
-
-class ChatResponse(BaseModel):
-    """Response from Claude chat."""
-
-    content: list[dict[str, Any]]
-    model: str | None = None
-    stop_reason: str | None = None
 
 
 # Plan generation schemas
