@@ -445,6 +445,11 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+}
+
+.form-group:last-child {
+  margin-bottom: 0;
 }
 
 .form-label {
