@@ -1,6 +1,6 @@
 # Dependencies
 node_modules/
-python_modules/
+# python_modules/ - committed for reliable CI deployments
 .venv/
 .venv-workers/
 
