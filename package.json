@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "wrangler pages dev src/pages --kv INVITE_CODES --port 8788",
     "deploy": "wrangler pages deploy src/pages --project-name athletics-annual-plan",
-    "codes": "node scripts/manage-codes.js"
+    "codes": "node scripts/manage-codes.js",
+    "test:worker": "cd workers && ./run-tests.sh",
+    "test:backend": "cd backend && pytest tests/ -v"
   },
   "devDependencies": {
     "wrangler": "^4.60.0"
