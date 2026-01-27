@@ -3,6 +3,7 @@ name = "athletics-annual-plan-api"
 main = "src/worker.py"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["python_workers"]
+account_id = "bac0f769fdfa1f0407d6c6da3004068d"
 
 [vars]
 CORS_ORIGIN = "https://athletics-annual-plan.pages.dev"
