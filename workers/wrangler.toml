@@ -7,5 +7,10 @@ compatibility_flags = ["python_workers"]
 [vars]
 CORS_ORIGIN = "https://athletics-annual-plan.pages.dev"
 
+# KV namespace for invite codes
+[[kv_namespaces]]
+binding = "INVITE_CODES"
+id = "bd8a895affc44045a898b31a2cced441"
+
 # Secrets (set via: npx wrangler secret put CLAUDE_API_KEY)
 # CLAUDE_API_KEY = "sk-..."

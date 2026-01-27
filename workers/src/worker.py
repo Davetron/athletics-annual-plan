@@ -41,6 +41,9 @@ async def on_fetch(request, env):
     if path == "/api/chat" and method == "POST":
         return await handle_chat(request, env, cors_headers)
 
+    if path == "/api/validate-code" and method == "POST":
+        return await handle_validate_code(request, env, cors_headers)
+
     return json_response({"error": "Not found"}, cors_headers, 404)
 
 
@@ -209,3 +212,60 @@ async def handle_chat(request, env, cors_headers):
 
     except Exception as e:
         return json_response({"error": str(e)}, cors_headers, 500)
+
+
+async def handle_validate_code(request, env, cors_headers):
+    """Validate an invite code and return a session ID."""
+    import uuid
+
+    try:
+        body = await request.json()
+        body = json.loads(JSON.stringify(body))
+        code = body.get("code", "").strip().upper()
+
+        if not code:
+            return json_response({"valid": False, "error": "Code is required"}, cors_headers, 400)
+
+        # Get KV namespace
+        kv = getattr(env, "INVITE_CODES", None)
+        if not kv:
+            return json_response({"valid": False, "error": "Invite codes not configured"}, cors_headers, 500)
+
+        # Look up code in KV (stored as JSON: {"active": true, "max_uses": 100, "current_uses": 5})
+        code_data_str = await kv.get(code)
+        if not code_data_str:
+            return json_response({"valid": False, "error": "Invalid invite code"}, cors_headers)
+
+        code_data = json.loads(code_data_str)
+
+        # Check if active
+        if not code_data.get("active", False):
+            return json_response({"valid": False, "error": "This code is no longer active"}, cors_headers)
+
+        # Check usage limits
+        max_uses = code_data.get("max_uses")
+        current_uses = code_data.get("current_uses", 0)
+
+        if max_uses is not None and current_uses >= max_uses:
+            return json_response({"valid": False, "error": "This code has reached its usage limit"}, cors_headers)
+
+        # Increment usage count
+        code_data["current_uses"] = current_uses + 1
+        await kv.put(code, json.dumps(code_data))
+
+        # Generate session ID
+        session_id = str(uuid.uuid4())
+
+        # Calculate remaining uses
+        remaining = None
+        if max_uses is not None:
+            remaining = max_uses - code_data["current_uses"]
+
+        return json_response({
+            "valid": True,
+            "session_id": session_id,
+            "remaining_uses": remaining,
+        }, cors_headers)
+
+    except Exception as e:
+        return json_response({"valid": False, "error": str(e)}, cors_headers, 500)
