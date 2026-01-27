@@ -143,10 +143,11 @@ class App {
     // Spreadsheet container
     this.spreadsheetContainer = document.getElementById('spreadsheet-container');
 
-    // Generation modal elements
+    // Loading modal elements
+    this.searchModal = document.getElementById('search-modal');
+    this.searchStatus = document.getElementById('search-status');
     this.generationModal = document.getElementById('generation-modal');
     this.generationStatus = document.getElementById('generation-status');
-    this.searchStatusText = this.competitionsLoading.querySelector('p');
 
     // Season select
     this.seasonSelect = document.getElementById('season');
@@ -260,8 +261,8 @@ class App {
    * Search for competitions based on form data
    */
   async searchCompetitions() {
-    // Show loading state
-    this.competitionsLoading.style.display = 'flex';
+    // Show loading modal
+    this.searchModal.classList.add('active');
     this.competitionsError.style.display = 'none';
     this.competitionsList.style.display = 'none';
     this.addCustomSection.style.display = 'none';
@@ -271,7 +272,7 @@ class App {
 
     // Start cycling through search status messages
     this.searchStatusInterval = this.startStatusCycle(
-      this.searchStatusText,
+      this.searchStatus,
       searchStatusMessages
     );
 
@@ -323,7 +324,7 @@ class App {
    * Render the competition list
    */
   renderCompetitions() {
-    this.competitionsLoading.style.display = 'none';
+    this.searchModal.classList.remove('active');
     this.competitionsError.style.display = 'none';
     this.competitionsList.style.display = 'flex';
     this.addCustomSection.style.display = 'block';
@@ -478,7 +479,7 @@ class App {
    * Show competition search error
    */
   showCompetitionError(message) {
-    this.competitionsLoading.style.display = 'none';
+    this.searchModal.classList.remove('active');
     this.competitionsError.style.display = 'block';
     this.competitionsList.style.display = 'none';
     this.addCustomSection.style.display = 'none';
