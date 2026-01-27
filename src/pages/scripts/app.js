@@ -191,7 +191,6 @@ class App {
       trainingLevel: formData.get('trainingLevel'),
       country: formData.get('country'),
       compLevels: formData.getAll('compLevels'),
-      targetCompetitions: formData.get('targetCompetitions'),
     };
 
     // Go to competitions step and search
