@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Plan - Athletics Annual Plan</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles/main.css">
+</head>
+<body class="app">
+  <header class="app-header">
+    <div class="app-logo">
+      <span class="logo-lanes">
+        <span></span><span></span><span></span>
+      </span>
+      <span class="app-title">ANNUAL PLAN</span>
+    </div>
+    <div class="step-indicator">
+      <span class="step-dot active" data-step="1"></span>
+      <span class="step-dot" data-step="2"></span>
+      <span class="step-dot" data-step="3"></span>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <!-- Step 1: Basic Info Form (unchanged) -->
+    <section id="step-form" class="step-section active" data-step="1">
+      <h2 class="step-title">LET'S BUILD YOUR PLAN</h2>
+      <p class="step-description">Tell us about your athletes and goals</p>
+
+      <form id="plan-form">
+        <div class="form-group">
+          <label class="form-label" for="athlete-name">Athlete / Squad Name</label>
+          <input
+            type="text"
+            id="athlete-name"
+            name="athleteName"
+            class="form-input"
+            placeholder="e.g., Senior Sprint Squad"
+            required
+          >
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="event-group">Event Group</label>
+          <select id="event-group" name="eventGroup" class="form-select" required>
+            <option value="">Select event group...</option>
+            <option value="sprints">Sprints (100m/200m)</option>
+            <option value="long-sprints">Long Sprints (400m/400mH)</option>
+            <option value="middle-distance">Middle Distance (800m/1500m)</option>
+            <option value="endurance">Endurance (3000m+)</option>
+            <option value="hurdles">Hurdles (110mH/100mH)</option>
+            <option value="jumps">Jumps (Long/Triple/High)</option>
+            <option value="throws">Throws</option>
+            <option value="multi-events">Multi-Events</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="season">Season Year</label>
+          <select id="season" name="season" class="form-select" required>
+            <option value="2024/2025">2024/2025</option>
+            <option value="2025/2026" selected>2025/2026</option>
+            <option value="2026/2027">2026/2027</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Periodization Type</label>
+          <div class="radio-group">
+            <div class="radio-option">
+              <input type="radio" id="bi-phase" name="periodization" value="bi-phase" checked>
+              <label for="bi-phase">
+                <span class="radio-title">BI-PHASE</span>
+                <span class="radio-desc">Indoor + Outdoor peaks</span>
+              </label>
+            </div>
+            <div class="radio-option">
+              <input type="radio" id="single-peak" name="periodization" value="single-peak">
+              <label for="single-peak">
+                <span class="radio-title">SINGLE PEAK</span>
+                <span class="radio-desc">One major competition</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Age Group (select all that apply)</label>
+          <div class="checkbox-group">
+            <label class="checkbox-option">
+              <input type="checkbox" name="ageGroups" value="Senior" checked>
+              <span>Senior</span>
+            </label>
+            <label class="checkbox-option">
+              <input type="checkbox" name="ageGroups" value="U23">
+              <span>U23</span>
+            </label>
+            <label class="checkbox-option">
+              <input type="checkbox" name="ageGroups" value="U20">
+              <span>U20</span>
+            </label>
+            <label class="checkbox-option">
+              <input type="checkbox" name="ageGroups" value="Masters">
+              <span>Masters</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Training Level</label>
+          <div class="radio-group">
+            <div class="radio-option">
+              <input type="radio" id="level-beginner" name="trainingLevel" value="beginner">
+              <label for="level-beginner">
+                <span class="radio-title">BEGINNER</span>
+                <span class="radio-desc">New to structured training</span>
+              </label>
+            </div>
+            <div class="radio-option">
+              <input type="radio" id="level-amateur" name="trainingLevel" value="amateur" checked>
+              <label for="level-amateur">
+                <span class="radio-title">AMATEUR</span>
+                <span class="radio-desc">Club level competitor</span>
+              </label>
+            </div>
+            <div class="radio-option">
+              <input type="radio" id="level-elite" name="trainingLevel" value="elite">
+              <label for="level-elite">
+                <span class="radio-title">ELITE</span>
+                <span class="radio-desc">National/International level</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Country</label>
+          <input
+            type="text"
+            id="country"
+            name="country"
+            class="form-input"
+            placeholder="e.g., Ireland"
+            value="Ireland"
+            required
+          >
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Competition Levels (select all that apply)</label>
+          <div class="checkbox-group">
+            <label class="checkbox-option">
+              <input type="checkbox" name="compLevels" value="national" checked>
+              <span>National Championships</span>
+            </label>
+            <label class="checkbox-option">
+              <input type="checkbox" name="compLevels" value="european">
+              <span>European Championships</span>
+            </label>
+            <label class="checkbox-option">
+              <input type="checkbox" name="compLevels" value="world">
+              <span>World Championships</span>
+            </label>
+            <label class="checkbox-option">
+              <input type="checkbox" name="compLevels" value="leagues">
+              <span>League/Graded Meets</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="target-competitions">Additional Notes (optional)</label>
+          <textarea
+            id="target-competitions"
+            name="targetCompetitions"
+            class="form-textarea"
+            placeholder="e.g., Focusing on 100m/200m, want to peak for July nationals"
+            rows="2"
+          ></textarea>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">
+            CONTINUE TO CHAT
+            <span>&rarr;</span>
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Step 2: Competition Discovery Chat (constrained scope) -->
+    <section id="step-chat" class="step-section" data-step="2">
+      <h2 class="step-title">DISCOVER YOUR COMPETITIONS</h2>
+      <p class="step-description">Let's build your competition calendar with priorities</p>
+
+      <div class="chat-container">
+        <div id="chat-messages" class="chat-messages">
+          <!-- Messages will be added here -->
+        </div>
+        <div class="chat-input-container">
+          <input
+            type="text"
+            id="chat-input"
+            class="chat-input"
+            placeholder="Type your response..."
+            autocomplete="off"
+          >
+          <button id="chat-send" class="chat-send" aria-label="Send message">
+            &uarr;
+          </button>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button id="back-to-form" class="btn btn-secondary">
+          <span>&larr;</span>
+          BACK
+        </button>
+        <button id="generate-plan-btn" class="btn btn-primary">
+          GENERATE PLAN
+          <span>&rarr;</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Step 3: Spreadsheet Preview -->
+    <section id="step-preview" class="step-section step-preview-section" data-step="3">
+      <div id="spreadsheet-container" class="spreadsheet-container">
+        <!-- Spreadsheet will be rendered here by spreadsheet.js -->
+      </div>
+      <div class="step-actions">
+        <button id="back-to-chat" class="btn btn-secondary">
+          <span>&larr;</span>
+          BACK
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Load dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@11.0.0/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+
+  <!-- Application scripts -->
+  <script type="module" src="/scripts/system-prompt.js"></script>
+  <script type="module" src="/scripts/periodization.js"></script>
+  <script type="module" src="/scripts/spreadsheet.js"></script>
+  <script type="module" src="/scripts/excel.js"></script>
+  <script type="module" src="/scripts/chat.js"></script>
+  <script type="module" src="/scripts/app.js"></script>
+</body>
+</html>

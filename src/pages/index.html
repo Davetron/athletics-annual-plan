@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Athletics Annual Plan</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles/main.css">
+</head>
+<body class="landing">
+  <!-- Track lane lines decoration -->
+  <div class="track-lines" aria-hidden="true">
+    <div class="lane"></div>
+    <div class="lane"></div>
+    <div class="lane"></div>
+    <div class="lane"></div>
+    <div class="lane"></div>
+    <div class="lane"></div>
+    <div class="lane"></div>
+    <div class="lane"></div>
+  </div>
+
+  <main class="landing-container">
+    <header class="landing-header">
+      <div class="logo-mark">
+        <span class="logo-lanes">
+          <span></span><span></span><span></span>
+        </span>
+      </div>
+      <h1 class="site-title">ANNUAL<br>PLAN</h1>
+      <p class="tagline">52-week periodized training plans for track & field</p>
+    </header>
+
+    <section class="invite-section">
+      <form id="invite-form" class="invite-form">
+        <label for="invite-code" class="invite-label">Enter your invite code</label>
+        <div class="input-group">
+          <input
+            type="text"
+            id="invite-code"
+            name="code"
+            class="invite-input"
+            placeholder="SPRINT2025"
+            autocomplete="off"
+            autocapitalize="characters"
+            spellcheck="false"
+            required
+          >
+          <button type="submit" class="invite-submit">
+            <span class="btn-text">GO</span>
+            <span class="btn-arrow">&rarr;</span>
+          </button>
+        </div>
+        <p id="error-message" class="error-message" hidden></p>
+      </form>
+    </section>
+
+    <section class="features">
+      <div class="feature">
+        <span class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+        </span>
+        <h3>52-Week Structure</h3>
+        <p>Complete season planning from General Prep through Competition phases</p>
+      </div>
+      <div class="feature">
+        <span class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 20V10"/>
+            <path d="M18 20V4"/>
+            <path d="M6 20v-4"/>
+          </svg>
+        </span>
+        <h3>Periodization</h3>
+        <p>Bi-phase (indoor + outdoor) or single-peak season structures</p>
+      </div>
+      <div class="feature">
+        <span class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+          </svg>
+        </span>
+        <h3>Excel Export</h3>
+        <p>Color-coded spreadsheets ready for your coaching toolkit</p>
+      </div>
+    </section>
+
+    <footer class="landing-footer">
+      <p>Built for coaches, by coaches</p>
+    </footer>
+  </main>
+
+  <script>
+    // API base URL - points to Python backend in development
+    const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? 'http://localhost:8000'
+      : '';
+
+    const form = document.getElementById('invite-form');
+    const input = document.getElementById('invite-code');
+    const errorEl = document.getElementById('error-message');
+
+    // Auto-uppercase the input
+    input.addEventListener('input', (e) => {
+      e.target.value = e.target.value.toUpperCase();
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const code = input.value.trim();
+
+      if (!code) return;
+
+      const submitBtn = form.querySelector('.invite-submit');
+      submitBtn.classList.add('loading');
+      errorEl.hidden = true;
+
+      try {
+        const response = await fetch(`${API_BASE}/api/validate-code`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code })
+        });
+
+        const data = await response.json();
+
+        if (data.valid) {
+          // Store session info
+          sessionStorage.setItem('inviteCode', code);
+          sessionStorage.setItem('sessionId', data.sessionId);
+
+          // Navigate to app
+          window.location.href = '/app.html';
+        } else {
+          errorEl.textContent = data.error || 'Invalid invite code';
+          errorEl.hidden = false;
+          input.focus();
+          input.select();
+        }
+      } catch (err) {
+        errorEl.textContent = 'Connection error. Please try again.';
+        errorEl.hidden = false;
+      } finally {
+        submitBtn.classList.remove('loading');
+      }
+    });
+  </script>
+</body>
+</html>

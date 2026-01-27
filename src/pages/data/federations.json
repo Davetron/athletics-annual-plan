@@ -1,0 +1,124 @@
+{
+  "federations": [
+    {
+      "country": "Ireland",
+      "name": "Athletics Ireland",
+      "code": "AAI",
+      "fixturesUrl": "https://www.athleticsireland.ie/competition/fixtures",
+      "keywords": ["irish", "ireland", "dublin", "cork", "galway"]
+    },
+    {
+      "country": "United Kingdom",
+      "name": "UK Athletics",
+      "code": "UKA",
+      "fixturesUrl": "https://www.uka.org.uk/events/",
+      "keywords": ["uk", "british", "england", "scotland", "wales", "northern ireland", "gb"]
+    },
+    {
+      "country": "United States",
+      "name": "USA Track & Field",
+      "code": "USATF",
+      "fixturesUrl": "https://www.usatf.org/events",
+      "keywords": ["usa", "american", "united states", "us"]
+    },
+    {
+      "country": "Australia",
+      "name": "Athletics Australia",
+      "code": "AA",
+      "fixturesUrl": "https://www.athletics.com.au/events/",
+      "keywords": ["australia", "australian", "sydney", "melbourne"]
+    },
+    {
+      "country": "Canada",
+      "name": "Athletics Canada",
+      "code": "AC",
+      "fixturesUrl": "https://athletics.ca/events/",
+      "keywords": ["canada", "canadian", "toronto", "vancouver"]
+    },
+    {
+      "country": "Germany",
+      "name": "Deutscher Leichtathletik-Verband",
+      "code": "DLV",
+      "fixturesUrl": "https://www.leichtathletik.de/termine",
+      "keywords": ["germany", "german", "deutschland"]
+    },
+    {
+      "country": "France",
+      "name": "Federation Francaise d'Athletisme",
+      "code": "FFA",
+      "fixturesUrl": "https://www.athle.fr/calendrier.aspx",
+      "keywords": ["france", "french", "paris"]
+    },
+    {
+      "country": "Spain",
+      "name": "Real Federacion Espanola de Atletismo",
+      "code": "RFEA",
+      "fixturesUrl": "https://www.rfea.es/web/calendario/",
+      "keywords": ["spain", "spanish", "espana", "madrid", "barcelona"]
+    },
+    {
+      "country": "International",
+      "name": "World Athletics",
+      "code": "WA",
+      "fixturesUrl": "https://worldathletics.org/competition/calendar-results",
+      "keywords": ["world", "international", "global", "olympics", "world championships"]
+    },
+    {
+      "country": "Europe",
+      "name": "European Athletics",
+      "code": "EA",
+      "fixturesUrl": "https://www.european-athletics.com/competitions",
+      "keywords": ["europe", "european", "continental"]
+    },
+    {
+      "country": "International",
+      "name": "World Masters Athletics",
+      "code": "WMA",
+      "fixturesUrl": "https://world-masters-athletics.com/events/",
+      "keywords": ["masters", "veteran", "over 35", "senior", "wma"]
+    },
+    {
+      "country": "Europe",
+      "name": "European Masters Athletics",
+      "code": "EMA",
+      "fixturesUrl": "https://european-masters-athletics.org/calendar/",
+      "keywords": ["masters europe", "european masters", "ema"]
+    }
+  ],
+  "majorEvents": {
+    "indoor": [
+      {
+        "name": "World Indoor Championships",
+        "frequency": "biennial-odd",
+        "typicalMonth": "March"
+      },
+      {
+        "name": "European Indoor Championships",
+        "frequency": "biennial-even",
+        "typicalMonth": "March"
+      }
+    ],
+    "outdoor": [
+      {
+        "name": "World Championships",
+        "frequency": "biennial-odd",
+        "typicalMonth": "August"
+      },
+      {
+        "name": "European Championships",
+        "frequency": "biennial-even",
+        "typicalMonth": "August"
+      },
+      {
+        "name": "Olympic Games",
+        "frequency": "quadrennial",
+        "typicalMonth": "July-August"
+      },
+      {
+        "name": "Diamond League",
+        "frequency": "annual",
+        "typicalMonth": "May-September"
+      }
+    ]
+  }
+}

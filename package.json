@@ -1,0 +1,14 @@
+{
+  "name": "athletics-annual-plan",
+  "version": "1.0.0",
+  "description": "Web app for generating 52-week periodized athletics training plans",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler pages dev src/pages --kv INVITE_CODES --port 8788",
+    "deploy": "wrangler pages deploy src/pages --project-name athletics-annual-plan",
+    "codes": "node scripts/manage-codes.js"
+  },
+  "devDependencies": {
+    "wrangler": "^4.60.0"
+  }
+}
