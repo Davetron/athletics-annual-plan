@@ -208,87 +208,114 @@ Importance levels:
 
 Type should be "indoor" or "outdoor".
 
-Only return the JSON array, no other text."""
+IMPORTANT: You MUST return a JSON array even if you couldn't find all competitions. Return what you found. If you found nothing, return an empty array []. Do not explain what you couldn't find - just return the JSON array."""
 
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "Content-Type": "application/json",
-                    "x-api-key": settings.claude_api_key,
-                    "anthropic-version": "2023-06-01",
-                },
-                json={
-                    "model": "claude-haiku-4-5-20251001",
-                    "max_tokens": 4096,
-                    "temperature": 0,
-                    "tools": [{"type": "web_search_20250305", "name": "web_search"}],
-                    "messages": [{"role": "user", "content": prompt}],
-                },
-                timeout=120.0,
-            )
+    max_attempts = 3
+    last_error = None
 
-            if response.status_code != 200:
-                error_detail = response.text[:500] if response.text else "No details"
-                print(f"[DEBUG] Search competitions API error: {response.status_code} - {error_detail}")
+    for attempt in range(1, max_attempts + 1):
+        try:
+            competitions = await _call_claude_search(prompt, attempt)
+            if competitions is not None:
                 return SearchCompetitionsResponse(
-                    success=False,
-                    error=f"Failed to search for competitions (status {response.status_code})",
+                    success=True,
+                    competitions=competitions,
+                )
+            # No JSON found, retry if attempts remain
+            if attempt < max_attempts:
+                print(f"[DEBUG] Attempt {attempt} returned no results, retrying...")
+                continue
+            else:
+                print(f"[DEBUG] All {max_attempts} attempts failed to return JSON")
+                return SearchCompetitionsResponse(
+                    success=True,
+                    competitions=[],
                 )
 
-            data = response.json()
+        except httpx.TimeoutException:
+            last_error = "Search request timed out"
+            if attempt < max_attempts:
+                print(f"[DEBUG] Attempt {attempt} timed out, retrying...")
+                continue
+        except httpx.RequestError as e:
+            last_error = f"Failed to search: {str(e)}"
+            if attempt < max_attempts:
+                print(f"[DEBUG] Attempt {attempt} request error: {e}, retrying...")
+                continue
 
-            # Extract text from response (handles multiple content blocks)
-            response_text = ""
-            for block in data.get("content", []):
-                if block.get("type") == "text":
-                    response_text += block.get("text", "")
+    return SearchCompetitionsResponse(
+        success=False,
+        error=last_error or "Search failed after multiple attempts",
+    )
 
-            # Debug: Log the raw response
-            print(f"[DEBUG] Claude response text ({len(response_text)} chars):")
-            print(f"[DEBUG] {response_text[:1000]}{'...' if len(response_text) > 1000 else ''}")
 
-            # Parse JSON from response
-            competitions = []
-            try:
-                start_idx = response_text.find("[")
-                end_idx = response_text.rfind("]") + 1
-                if start_idx != -1 and end_idx > start_idx:
-                    json_str = response_text[start_idx:end_idx]
-                    print(f"[DEBUG] Extracted JSON ({len(json_str)} chars)")
-                    raw_competitions = json.loads(json_str)
-                    print(f"[DEBUG] Parsed {len(raw_competitions)} competitions")
+async def _call_claude_search(prompt: str, attempt: int = 1) -> list[CompetitionResult] | None:
+    """
+    Make a single Claude API call for competition search.
+    Returns list of competitions if successful, None if no JSON found.
+    Raises httpx exceptions on network errors.
+    """
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "Content-Type": "application/json",
+                "x-api-key": settings.claude_api_key,
+                "anthropic-version": "2023-06-01",
+            },
+            json={
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 4096,
+                "temperature": 0,
+                "tools": [{"type": "web_search_20250305", "name": "web_search"}],
+                "messages": [{"role": "user", "content": prompt}],
+            },
+            timeout=120.0,
+        )
 
-                    for comp in raw_competitions:
-                        competitions.append(
-                            CompetitionResult(
-                                name=comp.get("name", "Unknown"),
-                                date=comp.get("date", ""),
-                                end_date=comp.get("end_date"),
-                                location=comp.get("location"),
-                                importance=comp.get("importance", 3),
-                                type=comp.get("type"),
-                            )
+        if response.status_code != 200:
+            error_detail = response.text[:500] if response.text else "No details"
+            print(f"[DEBUG] Attempt {attempt}: API error {response.status_code} - {error_detail}")
+            return None
+
+        data = response.json()
+
+        # Extract text from response (handles multiple content blocks)
+        response_text = ""
+        for block in data.get("content", []):
+            if block.get("type") == "text":
+                response_text += block.get("text", "")
+
+        # Debug: Log the raw response
+        print(f"[DEBUG] Attempt {attempt}: Claude response ({len(response_text)} chars):")
+        print(f"[DEBUG] {response_text[:1000]}{'...' if len(response_text) > 1000 else ''}")
+
+        # Parse JSON from response
+        try:
+            start_idx = response_text.find("[")
+            end_idx = response_text.rfind("]") + 1
+            if start_idx != -1 and end_idx > start_idx:
+                json_str = response_text[start_idx:end_idx]
+                print(f"[DEBUG] Attempt {attempt}: Extracted JSON ({len(json_str)} chars)")
+                raw_competitions = json.loads(json_str)
+                print(f"[DEBUG] Attempt {attempt}: Parsed {len(raw_competitions)} competitions")
+
+                competitions = []
+                for comp in raw_competitions:
+                    competitions.append(
+                        CompetitionResult(
+                            name=comp.get("name", "Unknown"),
+                            date=comp.get("date", ""),
+                            end_date=comp.get("end_date"),
+                            location=comp.get("location"),
+                            importance=comp.get("importance", 3),
+                            type=comp.get("type"),
                         )
-                else:
-                    print(f"[DEBUG] No JSON array found in response. start_idx={start_idx}, end_idx={end_idx}")
-            except json.JSONDecodeError as e:
-                print(f"[DEBUG] JSON parse error: {e}")
-                print(f"[DEBUG] Failed to parse: {json_str[:500] if 'json_str' in dir() else 'N/A'}")
-
-            return SearchCompetitionsResponse(
-                success=True,
-                competitions=competitions,
-            )
-
-    except httpx.TimeoutException:
-        return SearchCompetitionsResponse(
-            success=False,
-            error="Search request timed out",
-        )
-    except httpx.RequestError as e:
-        return SearchCompetitionsResponse(
-            success=False,
-            error=f"Failed to search: {str(e)}",
-        )
+                    )
+                return competitions
+            else:
+                print(f"[DEBUG] Attempt {attempt}: No JSON array found. start_idx={start_idx}, end_idx={end_idx}")
+                return None
+        except json.JSONDecodeError as e:
+            print(f"[DEBUG] Attempt {attempt}: JSON parse error: {e}")
+            return None
