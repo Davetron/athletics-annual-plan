@@ -122,12 +122,13 @@ Based on the athlete information provided, generate a complete plan using the ge
 - Weeks 46-52: Transition / Recovery
 
 ## Training Blocks
-Name blocks descriptively based on phase and sequence:
-- "Indoor Block 1", "Indoor Block 2", etc. for bi-phase indoor prep
-- "Outdoor Block 1", "Outdoor Block 2", etc. for outdoor prep
-- "Competition Block", "Taper Block", "Transition Block" as appropriate
+Use ONLY numbered blocks - no descriptive names:
+- For bi-phase: "Indoor Block 1", "Indoor Block 2", "Indoor Block 3", etc. for ALL indoor season weeks, then "Outdoor Block 1", "Outdoor Block 2", "Outdoor Block 3", etc. for ALL outdoor season weeks
+- For single-peak: "Block 1", "Block 2", "Block 3", "Block 4", etc. for ALL weeks
+- Transition and recovery weeks still get numbered block names (e.g., early season transition = "Indoor Block 1", end of season = "Outdoor Block 6")
 
-Each block typically spans 3-6 weeks with progressive load building.
+NEVER use descriptive names like "Transition Block", "Competition Block", "Taper Block", "Accumulation", "Realization", etc.
+Each block typically spans 3-6 weeks. Number blocks sequentially within each season segment.
 
 ## Weekly Load Patterns
 - Build progressively within blocks (2 → 3 → 4 → 2 deload)

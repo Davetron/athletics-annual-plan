@@ -633,7 +633,7 @@ class App {
   }
 
   /**
-   * Handle Excel download via server-side generation
+   * Handle Excel download - uses cached blob from preview when available
    */
   async handleDownload(plan) {
     plan = plan || this.plan;
@@ -644,6 +644,16 @@ class App {
     }
 
     const downloadBtn = this.spreadsheetContainer?.querySelector('#download-excel-btn');
+    const filename = `${plan.athlete}_Annual_Plan_${plan.season.replace('/', '-')}.xlsx`;
+
+    // Check for cached blob from spreadsheet preview (instant download)
+    const cachedBlob = this.spreadsheet?.getCachedBlob();
+    if (cachedBlob) {
+      this.downloadBlob(cachedBlob, filename);
+      return;
+    }
+
+    // Fallback: fetch from API if no cached blob
     if (downloadBtn) {
       downloadBtn.disabled = true;
       downloadBtn.textContent = 'GENERATING...';
@@ -660,24 +670,8 @@ class App {
         throw new Error(`Download failed: ${response.status}`);
       }
 
-      // Get filename from Content-Disposition header or generate one
-      const contentDisposition = response.headers.get('Content-Disposition');
-      let filename = `${plan.athlete}_Annual_Plan_${plan.season.replace('/', '-')}.xlsx`;
-      if (contentDisposition) {
-        const match = contentDisposition.match(/filename="?([^"]+)"?/);
-        if (match) filename = match[1];
-      }
-
-      // Download the blob
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      this.downloadBlob(blob, filename);
     } catch (error) {
       console.error('Download error:', error);
       alert('Failed to generate Excel file. Please try again.');
@@ -687,6 +681,20 @@ class App {
         downloadBtn.textContent = 'Download Excel';
       }
     }
+  }
+
+  /**
+   * Trigger a blob download with the given filename
+   */
+  downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
   /**

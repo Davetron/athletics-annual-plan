@@ -1,51 +1,258 @@
 /**
- * Simple Spreadsheet Preview using SheetJS
- * Renders the plan as a read-only HTML table with Download button
+ * Spreadsheet Preview using ExcelJS
+ * Reads the Excel blob and renders it as HTML with full styling fidelity
  */
 
-// Color constants for phase types
-const PHASE_COLORS = {
-  'general-prep': '#FF9900',
-  'special-prep': '#FFDD00',
-  'competition': '#00CC66',
-  'taper': '#D9D9D9',
-};
-
-const LOAD_COLORS = {
-  4: '#E74C3C',
-  3: '#F39C12',
-  2: '#F1C40F',
-  1: '#2ECC71',
-  0: '#ECF0F1',
-};
-
-const IMPORTANCE_COLORS = {
-  1: '#E74C3C',
-  2: '#F39C12',
-  3: '#3498DB',
-};
+import { API_BASE } from './config.js';
 
 /**
- * SpreadsheetManager - Simple read-only preview
+ * SpreadsheetManager - Renders Excel blob as styled HTML table using ExcelJS
  */
 export class SpreadsheetManager {
   constructor(containerId, options = {}) {
     this.container = document.getElementById(containerId);
     this.plan = null;
+    this.cachedBlob = null;
     this.onPlanChange = options.onPlanChange || (() => {});
   }
 
   init(plan) {
     this.plan = plan;
+    this.cachedBlob = null;
     this.render();
   }
 
-  render() {
+  async render() {
     if (!this.container || !this.plan) return;
 
     this.container.textContent = '';
 
     // Toolbar with download button
+    const toolbar = this.createToolbar();
+    this.container.appendChild(toolbar);
+
+    // Scrollable preview container
+    const scrollContainer = document.createElement('div');
+    scrollContainer.className = 'spreadsheet-scroll-container';
+    this.container.appendChild(scrollContainer);
+
+    // Show loading state
+    this.showLoading(scrollContainer);
+
+    try {
+      // Fetch Excel blob from API
+      const blob = await this.fetchExcelBlob();
+      this.cachedBlob = blob;
+
+      // Read with ExcelJS
+      const arrayBuffer = await blob.arrayBuffer();
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(arrayBuffer);
+
+      // Get first worksheet
+      const worksheet = workbook.worksheets[0];
+
+      // Clear loading and render table
+      scrollContainer.textContent = '';
+      const table = this.buildTableFromWorksheet(worksheet);
+      scrollContainer.appendChild(table);
+    } catch (error) {
+      console.error('Failed to render Excel preview:', error);
+      this.showError(scrollContainer, error.message);
+    }
+  }
+
+  buildTableFromWorksheet(worksheet) {
+    const table = document.createElement('table');
+    table.className = 'plan-table excel-preview-table';
+
+    // Get merged cell ranges
+    const mergedCells = this.getMergedCellMap(worksheet);
+
+    // Determine actual data bounds
+    const rowCount = worksheet.rowCount;
+    const colCount = worksheet.columnCount;
+
+    // Build table rows
+    for (let rowNum = 1; rowNum <= rowCount; rowNum++) {
+      const row = worksheet.getRow(rowNum);
+      const tr = document.createElement('tr');
+
+      for (let colNum = 1; colNum <= colCount; colNum++) {
+        const cellAddress = this.getCellAddress(rowNum, colNum);
+        const mergeInfo = mergedCells.get(cellAddress);
+
+        // Skip cells that are part of a merge but not the top-left
+        if (mergeInfo && !mergeInfo.isOrigin) {
+          continue;
+        }
+
+        const cell = row.getCell(colNum);
+        const td = document.createElement('td');
+
+        // Apply merge spans
+        if (mergeInfo && mergeInfo.isOrigin) {
+          if (mergeInfo.rowSpan > 1) td.rowSpan = mergeInfo.rowSpan;
+          if (mergeInfo.colSpan > 1) td.colSpan = mergeInfo.colSpan;
+        }
+
+        // Set cell value
+        td.textContent = this.getCellDisplayValue(cell);
+
+        // Apply styles
+        this.applyCellStyles(td, cell, colNum === 1);
+
+        tr.appendChild(td);
+      }
+
+      table.appendChild(tr);
+    }
+
+    return table;
+  }
+
+  getMergedCellMap(worksheet) {
+    const mergeMap = new Map();
+
+    // worksheet.model.merges contains merge ranges like "B3:D3"
+    const merges = worksheet.model.merges || [];
+
+    for (const mergeRange of merges) {
+      // Parse range like "B3:F3" or "A19:A22"
+      const [start, end] = mergeRange.split(':');
+      const startCoord = this.parseCell(start);
+      const endCoord = this.parseCell(end);
+
+      const rowSpan = endCoord.row - startCoord.row + 1;
+      const colSpan = endCoord.col - startCoord.col + 1;
+
+      // Mark origin cell
+      const originAddress = this.getCellAddress(startCoord.row, startCoord.col);
+      mergeMap.set(originAddress, {
+        isOrigin: true,
+        rowSpan,
+        colSpan,
+      });
+
+      // Mark all other cells in the merge as non-origin
+      for (let r = startCoord.row; r <= endCoord.row; r++) {
+        for (let c = startCoord.col; c <= endCoord.col; c++) {
+          if (r === startCoord.row && c === startCoord.col) continue;
+          mergeMap.set(this.getCellAddress(r, c), { isOrigin: false });
+        }
+      }
+    }
+
+    return mergeMap;
+  }
+
+  parseCell(cellRef) {
+    // Parse "B3" into { row: 3, col: 2 }
+    const match = cellRef.match(/^([A-Z]+)(\d+)$/);
+    if (!match) return { row: 1, col: 1 };
+
+    const colStr = match[1];
+    const row = parseInt(match[2], 10);
+
+    // Convert column letters to number (A=1, B=2, ..., Z=26, AA=27, etc.)
+    let col = 0;
+    for (let i = 0; i < colStr.length; i++) {
+      col = col * 26 + (colStr.charCodeAt(i) - 64);
+    }
+
+    return { row, col };
+  }
+
+  getCellAddress(row, col) {
+    return `${row},${col}`;
+  }
+
+  getCellDisplayValue(cell) {
+    if (cell.value === null || cell.value === undefined) {
+      return '';
+    }
+
+    // Handle rich text
+    if (typeof cell.value === 'object' && cell.value.richText) {
+      return cell.value.richText.map(rt => rt.text).join('');
+    }
+
+    // Handle dates
+    if (cell.value instanceof Date) {
+      const d = cell.value;
+      return `${d.getDate()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getFullYear()).slice(-2)}`;
+    }
+
+    return String(cell.value);
+  }
+
+  applyCellStyles(td, cell, isLabelColumn) {
+    const styles = [];
+
+    // Background color from fill
+    if (cell.fill && cell.fill.fgColor) {
+      const color = this.argbToHex(cell.fill.fgColor);
+      if (color && color !== '#000000') {
+        styles.push(`background-color: ${color}`);
+      }
+    }
+
+    // Font styles (skip font-size to let CSS control it)
+    if (cell.font) {
+      if (cell.font.bold) {
+        styles.push('font-weight: bold');
+      }
+      if (cell.font.color) {
+        const fontColor = this.argbToHex(cell.font.color);
+        if (fontColor) {
+          styles.push(`color: ${fontColor}`);
+        }
+      }
+    }
+
+    // Alignment
+    if (cell.alignment) {
+      if (cell.alignment.horizontal) {
+        styles.push(`text-align: ${cell.alignment.horizontal}`);
+      }
+      if (cell.alignment.vertical) {
+        styles.push(`vertical-align: ${cell.alignment.vertical}`);
+      }
+      if (cell.alignment.wrapText) {
+        styles.push('white-space: normal');
+      }
+    }
+
+    // Apply label column class
+    if (isLabelColumn) {
+      td.className = 'label-cell';
+    }
+
+    if (styles.length > 0) {
+      td.style.cssText = styles.join('; ');
+    }
+  }
+
+  argbToHex(colorObj) {
+    if (!colorObj) return null;
+
+    // Handle theme colors (approximate)
+    if (colorObj.theme !== undefined) {
+      // Theme colors - return null to use default styling
+      return null;
+    }
+
+    // Handle ARGB format (e.g., "FF13B5BD")
+    if (colorObj.argb) {
+      const argb = colorObj.argb;
+      // Skip alpha, take RGB (lowercase for CSS matching)
+      return '#' + argb.substring(2).toLowerCase();
+    }
+
+    return null;
+  }
+
+  createToolbar() {
     const toolbar = document.createElement('div');
     toolbar.className = 'spreadsheet-toolbar';
 
@@ -74,15 +281,6 @@ export class SpreadsheetManager {
     toolbarActions.appendChild(downloadBtn);
 
     toolbar.appendChild(toolbarActions);
-    this.container.appendChild(toolbar);
-
-    // Scrollable table container
-    const scrollContainer = document.createElement('div');
-    scrollContainer.className = 'spreadsheet-scroll-container';
-
-    const table = this.buildTable();
-    scrollContainer.appendChild(table);
-    this.container.appendChild(scrollContainer);
 
     // Download button handler
     downloadBtn.addEventListener('click', () => {
@@ -91,190 +289,70 @@ export class SpreadsheetManager {
         bubbles: true
       }));
     });
+
+    return toolbar;
   }
 
-  buildTable() {
-    const table = document.createElement('table');
-    table.className = 'plan-table plan-table-detailed';
+  showLoading(container) {
+    container.textContent = '';
 
-    const weeks = this.plan.weeks;
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'xlsx-preview-loading';
 
-    // Header row with week numbers
-    const thead = document.createElement('thead');
-    const headerRow = document.createElement('tr');
+    const track = document.createElement('div');
+    track.className = 'loading-track';
 
-    const labelTh = document.createElement('th');
-    labelTh.className = 'label-cell';
-    labelTh.textContent = 'Week';
-    headerRow.appendChild(labelTh);
+    const runner = document.createElement('div');
+    runner.className = 'loading-runner';
+    track.appendChild(runner);
 
-    weeks.forEach(w => {
-      const th = document.createElement('th');
-      th.className = 'week-header';
-      th.textContent = w.weekNum;
-      headerRow.appendChild(th);
-    });
-    thead.appendChild(headerRow);
-    table.appendChild(thead);
+    const status = document.createElement('p');
+    status.className = 'loading-status';
+    status.textContent = 'Rendering preview...';
 
-    const tbody = document.createElement('tbody');
-
-    // Month row (merged)
-    tbody.appendChild(this.createMergedRow('Month', weeks, w => w.month, '#1ABC9C'));
-
-    // Date row
-    tbody.appendChild(this.createDataRow('Date', weeks, w => this.formatDate(w.startDate)));
-
-    // Phase row (merged, full name)
-    tbody.appendChild(this.createMergedRow('Phase', weeks, w => w.phase, null, w => PHASE_COLORS[w.phaseType]));
-
-    // Block section: name row + intensity rows
-    tbody.appendChild(this.createMergedRow('Block', weeks, w => w.block, '#B4C6E7'));
-
-    // Weekly Load section (stacked bar visualization)
-    [4, 3, 2, 1].forEach((level, index) => {
-      tbody.appendChild(this.createBlockIntensityRow(level, weeks, index === 0));
-    });
-
-    // Competition row (color-coded by importance)
-    tbody.appendChild(this.createDataRow('Competition', weeks, w => w.competitions?.join(', ') || '', null, w => {
-      if (w.competitionImportance) return IMPORTANCE_COLORS[w.competitionImportance];
-      return null;
-    }));
-
-    // Technical focus row
-    tbody.appendChild(this.createDataRow('Technical', weeks, w => w.technical || ''));
-
-    // Physical focus row
-    tbody.appendChild(this.createDataRow('Physical', weeks, w => w.physical || ''));
-
-    table.appendChild(tbody);
-    return table;
+    loadingDiv.appendChild(track);
+    loadingDiv.appendChild(status);
+    container.appendChild(loadingDiv);
   }
 
-  createDataRow(label, weeks, getValue, defaultBg = null, getBg = null) {
-    const row = document.createElement('tr');
+  showError(container, message) {
+    container.textContent = '';
 
-    const labelCell = document.createElement('td');
-    labelCell.className = 'label-cell';
-    labelCell.textContent = label;
-    row.appendChild(labelCell);
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'xlsx-preview-error';
 
-    weeks.forEach(week => {
-      const td = document.createElement('td');
-      td.textContent = getValue(week);
-      const bg = getBg ? getBg(week) : defaultBg;
-      if (bg) {
-        td.style.background = bg;
-        // White text for dark backgrounds
-        if (['#E74C3C', '#F39C12', '#00CC66', '#3498DB'].includes(bg)) {
-          td.style.color = 'white';
-        }
-      }
-      row.appendChild(td);
-    });
+    const errorMsg = document.createElement('p');
+    errorMsg.textContent = `Failed to load preview: ${message}`;
+    errorDiv.appendChild(errorMsg);
 
-    return row;
+    const fallback = document.createElement('p');
+    fallback.textContent = 'You can still download the Excel file using the button above.';
+    errorDiv.appendChild(fallback);
+
+    container.appendChild(errorDiv);
   }
 
-  createMergedRow(label, weeks, getValue, bgColor, getBg = null) {
-    const row = document.createElement('tr');
-    row.className = 'merged-row';
+  async fetchExcelBlob() {
+    const response = await fetch(`${API_BASE}/api/download-excel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan: this.plan })
+    });
 
-    const labelCell = document.createElement('td');
-    labelCell.className = 'label-cell';
-    labelCell.textContent = label;
-    row.appendChild(labelCell);
-
-    // Calculate spans for merged cells
-    let i = 0;
-    while (i < weeks.length) {
-      const value = getValue(weeks[i]);
-      let span = 1;
-      while (i + span < weeks.length && getValue(weeks[i + span]) === value) {
-        span++;
-      }
-
-      const td = document.createElement('td');
-      td.colSpan = span;
-      td.textContent = value || '';
-
-      // Use dynamic background if provided, otherwise use static bgColor
-      const bg = getBg ? getBg(weeks[i]) : bgColor;
-      if (bg) {
-        td.style.background = bg;
-        td.style.color = 'white';
-      }
-      td.style.fontWeight = 'bold';
-      td.style.textAlign = 'center';
-      row.appendChild(td);
-
-      i += span;
+    if (!response.ok) {
+      throw new Error(`API returned ${response.status}`);
     }
 
-    return row;
+    return await response.blob();
   }
 
-  /**
-   * Create a block intensity row for the stacked bar visualization.
-   * Shows the weekly load value only in cells where it matches the level.
-   * @param {number} level - The intensity level (1-4)
-   * @param {Array} weeks - The weeks data
-   * @param {boolean} showLabel - If true, show "Weekly Load" label with rowspan=4
-   */
-  createBlockIntensityRow(level, weeks, showLabel = false) {
-    const row = document.createElement('tr');
-    row.className = 'block-intensity-row';
-
-    // Only add label cell on first row (with rowspan)
-    if (showLabel) {
-      const labelCell = document.createElement('td');
-      labelCell.className = 'label-cell';
-      labelCell.textContent = 'Weekly Load';
-      labelCell.rowSpan = 4;
-      labelCell.style.verticalAlign = 'middle';
-      row.appendChild(labelCell);
-    }
-
-    weeks.forEach(week => {
-      const td = document.createElement('td');
-      td.className = 'block-intensity-cell';
-
-      // Only show value if week's load matches this level
-      if (week.load === level) {
-        td.textContent = level;
-        td.style.background = LOAD_COLORS[level];
-        td.style.fontWeight = 'bold';
-        td.style.textAlign = 'center';
-        // White text for better contrast
-        if (level >= 3) {
-          td.style.color = 'white';
-        }
-      }
-      row.appendChild(td);
-    });
-
-    return row;
-  }
-
-  formatDate(isoDate) {
-    if (!isoDate) return '';
-    const date = new Date(isoDate);
-    return `${date.getDate()}/${date.getMonth() + 1}`;
-  }
-
-  getPhaseAbbrev(phaseType) {
-    const abbrevs = {
-      'general-prep': 'GP',
-      'special-prep': 'SP',
-      'competition': 'Comp',
-      'taper': 'Tap',
-    };
-    return abbrevs[phaseType] || '';
+  getCachedBlob() {
+    return this.cachedBlob;
   }
 
   updatePlan(newPlan) {
     this.plan = newPlan;
+    this.cachedBlob = null;
     this.render();
   }
 
@@ -286,5 +364,6 @@ export class SpreadsheetManager {
     if (this.container) {
       this.container.textContent = '';
     }
+    this.cachedBlob = null;
   }
 }

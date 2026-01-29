@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Preview Test - Athletics Annual Plan</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles/main.css">
+  <style>
+    .test-container {
+      padding: var(--space-lg);
+      max-width: 100%;
+    }
+    .test-header {
+      margin-bottom: var(--space-lg);
+      padding-bottom: var(--space-md);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .test-header h1 {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      color: var(--text-primary);
+      margin-bottom: var(--space-xs);
+    }
+    .test-header p {
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+    }
+  </style>
+</head>
+<body class="app">
+  <div class="test-container">
+    <div class="test-header">
+      <h1>EXCEL PREVIEW TEST</h1>
+      <p>Iterating on spreadsheet rendering</p>
+    </div>
+
+    <div id="spreadsheet-container" class="spreadsheet-container">
+      <!-- SpreadsheetManager will render here -->
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+  <script type="module">
+    import { SpreadsheetManager } from '/scripts/spreadsheet.js';
+
+    // Sample plan data matching backend schema
+    const samplePlan = generateSamplePlan();
+
+    function generateSamplePlan() {
+      const seasonStart = '2025-10-06';
+      const phases = [
+        { phase: 'General Preparation', phaseType: 'GPP', block: 'Indoor Block 1' },
+        { phase: 'General Preparation', phaseType: 'GPP', block: 'Indoor Block 2' },
+        { phase: 'Specific Preparation', phaseType: 'SPP', block: 'Outdoor Block 1' },
+        { phase: 'Specific Preparation', phaseType: 'SPP', block: 'Outdoor Block 2' },
+        { phase: 'Competition', phaseType: 'COMP', block: 'Outdoor Block 3' },
+        { phase: 'Transition', phaseType: 'TRANS', block: 'Outdoor Block 4' }
+      ];
+      const months = ['Oct', 'Oct', 'Nov', 'Nov', 'Nov', 'Nov', 'Dec', 'Dec', 'Dec', 'Dec',
+                      'Jan', 'Jan', 'Jan', 'Jan', 'Feb', 'Feb', 'Feb', 'Feb', 'Mar', 'Mar',
+                      'Mar', 'Mar', 'Apr', 'Apr', 'Apr', 'Apr', 'May', 'May', 'May', 'May',
+                      'Jun', 'Jun', 'Jun', 'Jun', 'Jul', 'Jul', 'Jul', 'Jul', 'Aug', 'Aug',
+                      'Aug', 'Aug', 'Sep', 'Sep', 'Sep', 'Sep', 'Oct', 'Oct', 'Oct', 'Oct',
+                      'Oct', 'Oct'];
+
+      const weeks = [];
+      const startDate = new Date(seasonStart);
+
+      for (let i = 0; i < 52; i++) {
+        const weekStart = new Date(startDate);
+        weekStart.setDate(startDate.getDate() + (i * 7));
+        const phaseIndex = Math.floor(i / 9) % phases.length;
+        const phaseInfo = phases[phaseIndex];
+
+        // Load pattern: 3-1 (3 weeks build, 1 week recovery)
+        const loadPattern = [3, 3, 4, 1]; // med, med, high, low
+        const load = loadPattern[i % 4];
+
+        weeks.push({
+          weekNum: i + 1,
+          startDate: weekStart.toISOString().split('T')[0],
+          month: months[i] || 'Oct',
+          phase: phaseInfo.phase,
+          phaseType: phaseInfo.phaseType,
+          block: phaseInfo.block,
+          load: load,
+          competitions: null,
+          competitionImportance: null,
+          technical: ['Acceleration', 'Max Velocity', 'Speed Endurance', 'Block Starts'][i % 4],
+          physical: ['Strength', 'Power', 'Plyometrics', 'Core'][i % 4],
+          dailyIntensity: [2, 3, 1, 4, 2, 0, 0] // Mon-Sun intensity
+        });
+      }
+
+      // Add competitions to specific weeks
+      weeks[20].competitions = ['National Indoor Championships'];
+      weeks[20].competitionImportance = 1;
+      weeks[40].competitions = ['National Outdoor Championships'];
+      weeks[40].competitionImportance = 1;
+      weeks[30].competitions = ['League Meet'];
+      weeks[30].competitionImportance = 3;
+
+      return {
+        athlete: "Test Squad",
+        season: "2025/26",
+        eventGroup: "Sprints (100m/200m)",
+        periodization: "Bi-Phase",
+        trainingLevel: "amateur",
+        seasonStart: seasonStart,
+        competitions: [
+          { name: "National Indoor Championships", date: "2026-02-22", weekNum: 21, importance: 1 },
+          { name: "National Outdoor Championships", date: "2026-07-18", weekNum: 41, importance: 1 },
+          { name: "League Meet", date: "2026-05-09", weekNum: 31, importance: 3 }
+        ],
+        weeks: weeks
+      };
+    }
+
+    // Initialize spreadsheet
+    const spreadsheet = new SpreadsheetManager('spreadsheet-container');
+    spreadsheet.init(samplePlan);
+
+    // Handle download button
+    document.addEventListener('download-excel', async (e) => {
+      const blob = spreadsheet.getCachedBlob();
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${samplePlan.athlete}-${samplePlan.season}.xlsx`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    });
+  </script>
+</body>
+</html>
