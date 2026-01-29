@@ -4,7 +4,6 @@ In production, use Redis or similar for distributed rate limiting.
 """
 
 import time
-from collections import defaultdict
 from threading import Lock
 
 
@@ -59,5 +58,4 @@ class RateLimiter:
 
 
 # Global rate limiter instances
-chat_limiter = RateLimiter(window_seconds=60, max_requests=10)
 generate_limiter = RateLimiter(window_seconds=60, max_requests=5)

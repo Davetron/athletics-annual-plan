@@ -152,21 +152,6 @@ async def test_validate_code_increments_usage(client):
 # =============================================================================
 
 @pytest.mark.asyncio
-async def test_chat_requires_session_id(client):
-    """Test that chat endpoint requires X-Session-ID header."""
-    response = await client.post(
-        "/api/chat",
-        json={
-            "system": "You are a helpful assistant.",
-            "messages": [{"role": "user", "content": "Hello"}]
-        }
-    )
-
-    assert response.status_code == 401
-    assert "Session ID required" in response.json()["detail"]
-
-
-@pytest.mark.asyncio
 async def test_generate_plan_requires_session_id(client):
     """Test that generate-plan endpoint requires X-Session-ID header."""
     response = await client.post(
@@ -377,39 +362,6 @@ async def test_download_excel_with_daily_intensity(client):
     for day_idx, expected in enumerate(expected_values):
         cell_value = ws.cell(row=22 + day_idx, column=2).value
         assert cell_value == expected, f"Day {day_idx} intensity should be {expected}, got {cell_value}"
-
-
-# =============================================================================
-# Chat Tests (requires API key)
-# =============================================================================
-
-@requires_api
-@pytest.mark.asyncio
-async def test_chat_real_api(client):
-    """Test chat endpoint with real Claude API."""
-    # First get a session ID
-    auth_response = await client.post("/api/validate-code", json={"code": "TESTCODE"})
-    session_id = auth_response.json()["session_id"]
-
-    response = await client.post(
-        "/api/chat",
-        headers={"X-Session-ID": session_id},
-        json={
-            "system": "You are a track and field coach. Respond briefly.",
-            "messages": [{"role": "user", "content": "What's the most important phase in a sprinter's annual plan?"}]
-        },
-        timeout=60.0
-    )
-
-    assert response.status_code == 200
-    data = response.json()
-    assert "content" in data
-    assert len(data["content"]) > 0
-
-    # Check that we got a text response
-    text_content = next((block for block in data["content"] if block.get("type") == "text"), None)
-    assert text_content is not None
-    assert len(text_content.get("text", "")) > 10
 
 
 # =============================================================================
@@ -633,63 +585,3 @@ async def test_generate_plan_masters_athlete(client):
     assert len(data["plan"]["weeks"]) == 52
 
 
-@requires_api
-@pytest.mark.asyncio
-async def test_chat_then_generate_flow(client):
-    """
-    Test the flow where user chats first, then generates a plan.
-    The chat context should influence the generated plan.
-    """
-    # Login
-    auth_response = await client.post("/api/validate-code", json={"code": "TESTCODE"})
-    session_id = auth_response.json()["session_id"]
-
-    # Chat with the coach
-    chat_response = await client.post(
-        "/api/chat",
-        headers={"X-Session-ID": session_id},
-        json={
-            "system": "You are a track and field coach helping plan a training season.",
-            "messages": [
-                {"role": "user", "content": "I'm a 400m runner preparing for the European Championships in August."}
-            ]
-        },
-        timeout=60.0
-    )
-    assert chat_response.status_code == 200
-
-    # Get the assistant's response
-    chat_data = chat_response.json()
-    assistant_msg = next(
-        (block["text"] for block in chat_data.get("content", []) if block.get("type") == "text"),
-        ""
-    )
-
-    # Generate plan with chat context
-    plan_response = await client.post(
-        "/api/generate-plan",
-        headers={"X-Session-ID": session_id},
-        json={
-            "formData": {
-                "athleteName": "400m Specialist",
-                "eventGroup": "long-sprints",
-                "season": "2025/2026",
-                "periodization": "bi-phase",
-                "ageGroups": ["Senior"],
-                "trainingLevel": "elite",
-                "country": "Germany",
-                "compLevels": ["National", "European"],
-                "targetCompetitions": "European Championships in August"
-            },
-            "messages": [
-                {"role": "user", "content": "I'm a 400m runner preparing for the European Championships in August."},
-                {"role": "assistant", "content": assistant_msg}
-            ]
-        },
-        timeout=120.0
-    )
-
-    assert plan_response.status_code == 200
-    plan_data = plan_response.json()
-    assert plan_data["success"] is True
-    assert len(plan_data["plan"]["weeks"]) == 52
