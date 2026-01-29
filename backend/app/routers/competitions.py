@@ -245,6 +245,10 @@ Only return the JSON array, no other text."""
                 if block.get("type") == "text":
                     response_text += block.get("text", "")
 
+            # Debug: Log the raw response
+            print(f"[DEBUG] Claude response text ({len(response_text)} chars):")
+            print(f"[DEBUG] {response_text[:1000]}{'...' if len(response_text) > 1000 else ''}")
+
             # Parse JSON from response
             competitions = []
             try:
@@ -252,7 +256,9 @@ Only return the JSON array, no other text."""
                 end_idx = response_text.rfind("]") + 1
                 if start_idx != -1 and end_idx > start_idx:
                     json_str = response_text[start_idx:end_idx]
+                    print(f"[DEBUG] Extracted JSON ({len(json_str)} chars)")
                     raw_competitions = json.loads(json_str)
+                    print(f"[DEBUG] Parsed {len(raw_competitions)} competitions")
 
                     for comp in raw_competitions:
                         competitions.append(
@@ -265,8 +271,11 @@ Only return the JSON array, no other text."""
                                 type=comp.get("type"),
                             )
                         )
-            except json.JSONDecodeError:
-                pass
+                else:
+                    print(f"[DEBUG] No JSON array found in response. start_idx={start_idx}, end_idx={end_idx}")
+            except json.JSONDecodeError as e:
+                print(f"[DEBUG] JSON parse error: {e}")
+                print(f"[DEBUG] Failed to parse: {json_str[:500] if 'json_str' in dir() else 'N/A'}")
 
             return SearchCompetitionsResponse(
                 success=True,
