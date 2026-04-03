@@ -7,11 +7,13 @@ account_id = "bac0f769fdfa1f0407d6c6da3004068d"
 
 [vars]
 CORS_ORIGIN = "https://athletics-annual-plan.pages.dev"
+LLM_PROVIDER = "claude"
 
 # KV namespace for invite codes
 [[kv_namespaces]]
 binding = "INVITE_CODES"
 id = "bd8a895affc44045a898b31a2cced441"
 
-# Secrets (set via: npx wrangler secret put CLAUDE_API_KEY)
-# CLAUDE_API_KEY = "sk-..."
+# Secrets (set via wrangler):
+# npx wrangler secret put CLAUDE_API_KEY
+# npx wrangler secret put GEMINI_API_KEY
