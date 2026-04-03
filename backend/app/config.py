@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     # Claude API
     claude_api_key: str = ""
 
+    # LLM provider selection
+    llm_provider: str = "claude"  # "claude" or "gemini"
+    gemini_api_key: str = ""
+
     # Database
     database_url: str = "sqlite+aiosqlite:///./athletics.db"
 
