@@ -130,3 +130,138 @@ class TestGeminiSchemaTranslation:
         # Check nullable competitionImportance
         week_props = weeks_schema["items"]["properties"]
         assert week_props["competitionImportance"]["nullable"] is True
+
+
+from unittest.mock import AsyncMock, patch, MagicMock
+
+
+class TestGeminiPlanGeneration:
+    """Tests for Gemini generate_plan response parsing."""
+
+    @pytest.mark.asyncio
+    async def test_successful_plan_extraction(self):
+        """Extracts plan from Gemini functionCall response."""
+        from app.services.llm.gemini import generate_plan
+
+        # Build a minimal valid 52-week plan
+        weeks = [
+            {
+                "weekNum": i + 1,
+                "startDate": f"2025-09-{(i % 28) + 1:02d}",
+                "month": "Sep 25",
+                "phase": "General Prep",
+                "phaseType": "general-prep",
+                "load": 3,
+            }
+            for i in range(52)
+        ]
+        mock_plan = {
+            "athlete": "Test",
+            "season": "2025/2026",
+            "eventGroup": "sprints",
+            "periodization": "bi-phase",
+            "seasonStart": "2025-08-25",
+            "competitions": [],
+            "weeks": weeks,
+        }
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "functionCall": {
+                                    "name": "generate_annual_plan",
+                                    "args": mock_plan,
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+
+        mock_client = AsyncMock()
+        mock_client.post.return_value = mock_response
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("app.services.llm.gemini.httpx.AsyncClient", return_value=mock_client):
+            result = await generate_plan(
+                system_prompt="test prompt",
+                context_message="test message",
+                tool={"name": "generate_annual_plan", "description": "test", "input_schema": {"type": "object", "properties": {}}},
+                api_key="fake-key",
+            )
+
+        assert result["success"] is True
+        assert result["plan"]["athlete"] == "Test"
+        assert len(result["plan"]["weeks"]) == 52
+
+    @pytest.mark.asyncio
+    async def test_api_error_returns_failure(self):
+        """Non-200 response returns success=False."""
+        from app.services.llm.gemini import generate_plan
+
+        mock_response = MagicMock()
+        mock_response.status_code = 400
+        mock_response.text = "Bad request"
+
+        mock_client = AsyncMock()
+        mock_client.post.return_value = mock_response
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("app.services.llm.gemini.httpx.AsyncClient", return_value=mock_client):
+            result = await generate_plan(
+                system_prompt="test",
+                context_message="test",
+                tool={"name": "t", "description": "t", "input_schema": {"type": "object", "properties": {}}},
+                api_key="fake-key",
+            )
+
+        assert result["success"] is False
+        assert "400" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_incomplete_plan_returns_failure(self):
+        """Plan with fewer than 52 weeks returns success=False."""
+        from app.services.llm.gemini import generate_plan
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "functionCall": {
+                                    "name": "generate_annual_plan",
+                                    "args": {"weeks": [{"weekNum": 1}] * 30},
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+
+        mock_client = AsyncMock()
+        mock_client.post.return_value = mock_response
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("app.services.llm.gemini.httpx.AsyncClient", return_value=mock_client):
+            result = await generate_plan(
+                system_prompt="test",
+                context_message="test",
+                tool={"name": "generate_annual_plan", "description": "t", "input_schema": {"type": "object", "properties": {}}},
+                api_key="fake-key",
+            )
+
+        assert result["success"] is False
+        assert "30 weeks" in result["error"]
