@@ -146,7 +146,8 @@ def _extract_competitions_json(text: str) -> list[dict] | None:
                     "type": c.get("type"),
                 }
                 for c in raw
+                if isinstance(c, dict)
             ]
         return None
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, AttributeError):
         return None

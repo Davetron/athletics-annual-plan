@@ -12,9 +12,6 @@ import httpx
 API_BASE = "https://generativelanguage.googleapis.com/v1beta"
 MODEL = "gemini-2.5-flash-lite"
 
-# Keys in Claude's JSON Schema that Gemini's OpenAPI subset doesn't support
-_UNSUPPORTED_SCHEMA_KEYS = {"minItems", "maxItems", "minimum", "maximum"}
-
 
 def translate_tool_to_gemini(claude_tool: dict) -> dict:
     """Convert a Claude tool_use definition to a Gemini function declaration."""
@@ -93,7 +90,7 @@ async def generate_plan(
                 },
                 "generationConfig": {
                     "temperature": 0,
-                    "maxOutputTokens": 16384,
+                    "maxOutputTokens": 32768,
                 },
             },
             timeout=120.0,
@@ -121,6 +118,8 @@ async def generate_plan(
                 break
 
         if plan is None:
+            finish_reason = data.get("candidates", [{}])[0].get("finishReason", "UNKNOWN")
+            print(f"[DEBUG] Gemini plan extraction failed, finishReason={finish_reason}")
             return {
                 "success": False,
                 "error": "Failed to generate structured plan. Please try again.",
@@ -203,7 +202,8 @@ def _extract_competitions_json(text: str) -> list[dict] | None:
                     "type": c.get("type"),
                 }
                 for c in raw
+                if isinstance(c, dict)
             ]
         return None
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, AttributeError):
         return None
