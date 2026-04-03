@@ -2,7 +2,6 @@
 Competition-related routes - URL fetching and competition search.
 """
 
-import json
 import re
 from urllib.parse import urlparse
 
@@ -17,6 +16,7 @@ from app.models.schemas import (
     SearchCompetitionsResponse,
     CompetitionResult,
 )
+from app.services.llm import get_provider
 
 router = APIRouter()
 settings = get_settings()
@@ -136,12 +136,19 @@ async def fetch_url(request: FetchUrlRequest):
 @router.post("/search-competitions", response_model=SearchCompetitionsResponse)
 async def search_competitions(request: SearchCompetitionsRequest):
     """
-    Search for athletics competitions using Claude API with web search.
-
-    Uses Claude's web_search tool to find real competition dates.
+    Search for athletics competitions using the configured LLM provider.
     """
-    if not settings.claude_api_key:
-        raise HTTPException(status_code=500, detail="Claude API key not configured")
+    provider = get_provider(settings.llm_provider)
+    api_key = (
+        settings.gemini_api_key
+        if settings.llm_provider == "gemini"
+        else settings.claude_api_key
+    )
+    if not api_key:
+        raise HTTPException(
+            status_code=500,
+            detail=f"{settings.llm_provider.title()} API key not configured",
+        )
 
     start_year = int(request.season_year.split("/")[0])
     end_year = int(request.season_year.split("/")[1])
@@ -215,13 +222,17 @@ IMPORTANT: You MUST return a JSON array even if you couldn't find all competitio
 
     for attempt in range(1, max_attempts + 1):
         try:
-            competitions = await _call_claude_search(prompt, attempt)
+            competitions = await provider.search_competitions(
+                prompt=prompt,
+                api_key=api_key,
+            )
             if competitions is not None:
                 return SearchCompetitionsResponse(
                     success=True,
-                    competitions=competitions,
+                    competitions=[
+                        CompetitionResult(**comp) for comp in competitions
+                    ],
                 )
-            # No JSON found, retry if attempts remain
             if attempt < max_attempts:
                 print(f"[DEBUG] Attempt {attempt} returned no results, retrying...")
                 continue
@@ -247,75 +258,3 @@ IMPORTANT: You MUST return a JSON array even if you couldn't find all competitio
         success=False,
         error=last_error or "Search failed after multiple attempts",
     )
-
-
-async def _call_claude_search(prompt: str, attempt: int = 1) -> list[CompetitionResult] | None:
-    """
-    Make a single Claude API call for competition search.
-    Returns list of competitions if successful, None if no JSON found.
-    Raises httpx exceptions on network errors.
-    """
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "Content-Type": "application/json",
-                "x-api-key": settings.claude_api_key,
-                "anthropic-version": "2023-06-01",
-            },
-            json={
-                "model": "claude-haiku-4-5-20251001",
-                "max_tokens": 4096,
-                "temperature": 0,
-                "tools": [{"type": "web_search_20250305", "name": "web_search"}],
-                "messages": [{"role": "user", "content": prompt}],
-            },
-            timeout=120.0,
-        )
-
-        if response.status_code != 200:
-            error_detail = response.text[:500] if response.text else "No details"
-            print(f"[DEBUG] Attempt {attempt}: API error {response.status_code} - {error_detail}")
-            return None
-
-        data = response.json()
-
-        # Extract text from response (handles multiple content blocks)
-        response_text = ""
-        for block in data.get("content", []):
-            if block.get("type") == "text":
-                response_text += block.get("text", "")
-
-        # Debug: Log the raw response
-        print(f"[DEBUG] Attempt {attempt}: Claude response ({len(response_text)} chars):")
-        print(f"[DEBUG] {response_text[:1000]}{'...' if len(response_text) > 1000 else ''}")
-
-        # Parse JSON from response
-        try:
-            start_idx = response_text.find("[")
-            end_idx = response_text.rfind("]") + 1
-            if start_idx != -1 and end_idx > start_idx:
-                json_str = response_text[start_idx:end_idx]
-                print(f"[DEBUG] Attempt {attempt}: Extracted JSON ({len(json_str)} chars)")
-                raw_competitions = json.loads(json_str)
-                print(f"[DEBUG] Attempt {attempt}: Parsed {len(raw_competitions)} competitions")
-
-                competitions = []
-                for comp in raw_competitions:
-                    competitions.append(
-                        CompetitionResult(
-                            name=comp.get("name", "Unknown"),
-                            date=comp.get("date", ""),
-                            end_date=comp.get("end_date"),
-                            location=comp.get("location"),
-                            importance=comp.get("importance", 3),
-                            type=comp.get("type"),
-                        )
-                    )
-                return competitions
-            else:
-                print(f"[DEBUG] Attempt {attempt}: No JSON array found. start_idx={start_idx}, end_idx={end_idx}")
-                return None
-        except json.JSONDecodeError as e:
-            print(f"[DEBUG] Attempt {attempt}: JSON parse error: {e}")
-            return None

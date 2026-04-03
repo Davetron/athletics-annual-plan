@@ -73,23 +73,26 @@ No automated tests. Manual testing via the browser.
 - `routers/competitions.py` - `/api/search-competitions`
 - `routers/auth.py` - `/api/validate-code`
 - `services/excel_generator.py` - openpyxl Excel generation (styling source of truth)
-- `services/plan_generator.py` - Claude tool_use schema for plan generation
+- `services/plan_generator.py` - Shared tool_use schema and prompts for plan generation
+- `services/llm/__init__.py` - LLM provider factory (Claude or Gemini)
+- `services/llm/claude.py` - Claude API provider (tool_use + web_search)
+- `services/llm/gemini.py` - Gemini API provider (function calling + Google Search grounding)
 
 ## API Endpoints
 
 | Endpoint | Description |
 |----------|-------------|
 | `POST /api/validate-code` | Validate invite codes |
-| `POST /api/generate-plan` | Generate 52-week plan via Claude |
+| `POST /api/generate-plan` | Generate 52-week plan via configured LLM |
 | `POST /api/download-excel` | Generate styled Excel file from plan |
-| `POST /api/search-competitions` | Search competitions via Claude |
+| `POST /api/search-competitions` | Search competitions via configured LLM |
 
 ## Dependencies
 
 ### Backend
 - Python 3.11+
 - FastAPI, uvicorn
-- anthropic SDK (Claude API)
+- anthropic SDK (Claude API) / Gemini REST API
 - openpyxl (Excel generation)
 - SQLAlchemy + aiosqlite
 
@@ -104,5 +107,15 @@ Backend requires `backend/.env`:
 CLAUDE_API_KEY=sk-ant-...
 DATABASE_URL=sqlite+aiosqlite:///./athletics.db
 ```
+
+### Switching LLM Provider
+
+To use Gemini instead of Claude, add to `backend/.env`:
+```
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=AIza...
+```
+
+Supported providers: `claude` (default), `gemini` (Gemini 2.5 Flash Lite).
 
 Frontend uses `/.dev.vars` for wrangler (KV binding for invite codes).

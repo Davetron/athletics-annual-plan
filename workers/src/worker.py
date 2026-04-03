@@ -65,17 +65,23 @@ def json_response(data, cors_headers, status=200):
 async def handle_generate_plan(request, env, cors_headers):
     """Handle plan generation request."""
     # Lazy import heavy modules
-    import httpx
     from plan_generator import GENERATE_PLAN_TOOL, GENERATION_SYSTEM_PROMPT, build_context_message
+    from llm_provider import generate_plan
 
     # Check session ID
     session_id = request.headers.get("X-Session-ID")
     if not session_id:
         return json_response({"success": False, "error": "Session ID required"}, cors_headers, 401)
 
-    api_key = getattr(env, "CLAUDE_API_KEY", None)
-    if not api_key:
-        return json_response({"success": False, "error": "Claude API key not configured"}, cors_headers, 500)
+    provider = getattr(env, "LLM_PROVIDER", "claude")
+    if provider == "gemini":
+        api_key = getattr(env, "GEMINI_API_KEY", None)
+        if not api_key:
+            return json_response({"success": False, "error": "Gemini API key not configured"}, cors_headers, 500)
+    else:
+        api_key = getattr(env, "CLAUDE_API_KEY", None)
+        if not api_key:
+            return json_response({"success": False, "error": "Claude API key not configured"}, cors_headers, 500)
 
     try:
         body = await request.json()
@@ -85,57 +91,8 @@ async def handle_generate_plan(request, env, cors_headers):
 
         context_message = build_context_message(form_data, messages)
 
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "Content-Type": "application/json",
-                    "Accept-Encoding": "identity",  # Disable compression for Pyodide compatibility
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01",
-                },
-                json={
-                    "model": "claude-haiku-4-5-20251001",
-                    "max_tokens": 16384,
-                    "system": GENERATION_SYSTEM_PROMPT,
-                    "tools": [GENERATE_PLAN_TOOL],
-                    "tool_choice": {"type": "tool", "name": "generate_annual_plan"},
-                    "messages": [{"role": "user", "content": context_message}],
-                },
-                timeout=120.0,
-            )
-
-            if response.status_code != 200:
-                return json_response(
-                    {"success": False, "error": f"Failed to generate plan (status {response.status_code})"},
-                    cors_headers,
-                )
-
-            data = response.json()
-
-            # Extract tool use result
-            tool_use = None
-            for block in data.get("content", []):
-                if block.get("type") == "tool_use" and block.get("name") == "generate_annual_plan":
-                    tool_use = block
-                    break
-
-            if not tool_use:
-                return json_response(
-                    {"success": False, "error": "Failed to generate structured plan"},
-                    cors_headers,
-                )
-
-            plan = tool_use.get("input", {})
-            weeks = plan.get("weeks", [])
-
-            if len(weeks) != 52:
-                return json_response(
-                    {"success": False, "error": f"Generated plan was incomplete ({len(weeks)} weeks)"},
-                    cors_headers,
-                )
-
-            return json_response({"success": True, "plan": plan}, cors_headers)
+        result = await generate_plan(provider, GENERATION_SYSTEM_PROMPT, context_message, GENERATE_PLAN_TOOL, api_key)
+        return json_response(result, cors_headers)
 
     except Exception as e:
         return json_response({"success": False, "error": str(e)}, cors_headers)
@@ -354,12 +311,18 @@ async def handle_fetch_url(request, cors_headers):
 
 
 async def handle_search_competitions(request, env, cors_headers):
-    """Search for athletics competitions using Claude with web search."""
-    import httpx
+    """Search for athletics competitions using the configured LLM provider."""
+    from llm_provider import search_competitions
 
-    api_key = getattr(env, "CLAUDE_API_KEY", None)
-    if not api_key:
-        return json_response({"success": False, "error": "Claude API key not configured"}, cors_headers, 500)
+    provider = getattr(env, "LLM_PROVIDER", "claude")
+    if provider == "gemini":
+        api_key = getattr(env, "GEMINI_API_KEY", None)
+        if not api_key:
+            return json_response({"success": False, "error": "Gemini API key not configured"}, cors_headers, 500)
+    else:
+        api_key = getattr(env, "CLAUDE_API_KEY", None)
+        if not api_key:
+            return json_response({"success": False, "error": "Claude API key not configured"}, cors_headers, 500)
 
     try:
         body = await request.json()
@@ -415,55 +378,11 @@ Type: "indoor" or "outdoor"
 
 Only return the JSON array, no other text."""
 
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "Content-Type": "application/json",
-                    "Accept-Encoding": "identity",  # Disable compression for Pyodide compatibility
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01",
-                },
-                json={
-                    "model": "claude-haiku-4-5-20251001",
-                    "max_tokens": 4096,
-                    "tools": [{"type": "web_search_20250305", "name": "web_search"}],
-                    "messages": [{"role": "user", "content": prompt}],
-                },
-                timeout=120.0,
-            )
-
-            if response.status_code != 200:
-                return json_response({"success": False, "error": f"Search failed (status {response.status_code})"}, cors_headers)
-
-            data = response.json()
-
-            # Extract text from response
-            response_text = ""
-            for block in data.get("content", []):
-                if block.get("type") == "text":
-                    response_text += block.get("text", "")
-
-            # Parse JSON from response
+        competitions = await search_competitions(provider, prompt, api_key)
+        if competitions is None:
             competitions = []
-            try:
-                start_idx = response_text.find("[")
-                end_idx = response_text.rfind("]") + 1
-                if start_idx != -1 and end_idx > start_idx:
-                    raw_competitions = json.loads(response_text[start_idx:end_idx])
-                    for comp in raw_competitions:
-                        competitions.append({
-                            "name": comp.get("name", "Unknown"),
-                            "date": comp.get("date", ""),
-                            "end_date": comp.get("end_date"),
-                            "location": comp.get("location"),
-                            "importance": comp.get("importance", 3),
-                            "type": comp.get("type"),
-                        })
-            except json.JSONDecodeError:
-                pass
 
-            return json_response({"success": True, "competitions": competitions}, cors_headers)
+        return json_response({"success": True, "competitions": competitions}, cors_headers)
 
     except Exception as e:
         return json_response({"success": False, "error": str(e)}, cors_headers, 500)
