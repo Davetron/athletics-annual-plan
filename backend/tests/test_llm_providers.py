@@ -265,3 +265,101 @@ class TestGeminiPlanGeneration:
 
         assert result["success"] is False
         assert "30 weeks" in result["error"]
+
+
+class TestGeminiCompetitionSearch:
+    """Tests for Gemini search_competitions response parsing."""
+
+    @pytest.mark.asyncio
+    async def test_successful_search(self):
+        """Extracts competitions from Gemini text response with grounding."""
+        from app.services.llm.gemini import search_competitions
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "text": 'Here are the competitions:\n[\n  {"name": "National Indoors", "date": "2026-02-21", "location": "Dublin", "importance": 1, "type": "indoor"}\n]'
+                            }
+                        ],
+                        "role": "model",
+                    },
+                    "groundingMetadata": {
+                        "webSearchQueries": ["Ireland athletics 2026"],
+                    },
+                }
+            ]
+        }
+
+        mock_client = AsyncMock()
+        mock_client.post.return_value = mock_response
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("app.services.llm.gemini.httpx.AsyncClient", return_value=mock_client):
+            result = await search_competitions(
+                prompt="Search for competitions",
+                api_key="fake-key",
+            )
+
+        assert result is not None
+        assert len(result) == 1
+        assert result[0]["name"] == "National Indoors"
+        assert result[0]["importance"] == 1
+
+    @pytest.mark.asyncio
+    async def test_no_json_returns_none(self):
+        """Response with no JSON array returns None."""
+        from app.services.llm.gemini import search_competitions
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [{"text": "I couldn't find any competitions."}],
+                        "role": "model",
+                    }
+                }
+            ]
+        }
+
+        mock_client = AsyncMock()
+        mock_client.post.return_value = mock_response
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("app.services.llm.gemini.httpx.AsyncClient", return_value=mock_client):
+            result = await search_competitions(
+                prompt="Search for competitions",
+                api_key="fake-key",
+            )
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_api_error_returns_none(self):
+        """Non-200 response returns None."""
+        from app.services.llm.gemini import search_competitions
+
+        mock_response = MagicMock()
+        mock_response.status_code = 500
+        mock_response.text = "Internal error"
+
+        mock_client = AsyncMock()
+        mock_client.post.return_value = mock_response
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("app.services.llm.gemini.httpx.AsyncClient", return_value=mock_client):
+            result = await search_competitions(
+                prompt="Search for competitions",
+                api_key="fake-key",
+            )
+
+        assert result is None

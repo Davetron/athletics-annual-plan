@@ -136,3 +136,74 @@ async def generate_plan(
             }
 
         return {"success": True, "plan": plan}
+
+
+async def search_competitions(
+    prompt: str,
+    api_key: str,
+) -> list[dict] | None:
+    """
+    Search for competitions using Gemini with Google Search grounding.
+
+    Returns list of competition dicts, or None if no JSON found.
+    Raises httpx exceptions on network errors.
+    """
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            f"{API_BASE}/models/{MODEL}:generateContent",
+            params={"key": api_key},
+            headers={"Content-Type": "application/json"},
+            json={
+                "contents": [
+                    {"role": "user", "parts": [{"text": prompt}]},
+                ],
+                "tools": [{"google_search": {}}],
+                "generationConfig": {
+                    "temperature": 0,
+                    "maxOutputTokens": 4096,
+                },
+            },
+            timeout=120.0,
+        )
+
+        if response.status_code != 200:
+            error_detail = response.text[:500] if response.text else "No details"
+            print(f"[DEBUG] Gemini search error: {response.status_code} - {error_detail}")
+            return None
+
+        data = response.json()
+
+        # Extract text from response
+        response_text = ""
+        for candidate in data.get("candidates", []):
+            for part in candidate.get("content", {}).get("parts", []):
+                if "text" in part:
+                    response_text += part["text"]
+
+        print(f"[DEBUG] Gemini search response ({len(response_text)} chars)")
+
+        # Parse JSON array from response (same format as Claude)
+        return _extract_competitions_json(response_text)
+
+
+def _extract_competitions_json(text: str) -> list[dict] | None:
+    """Extract a JSON array of competitions from response text."""
+    try:
+        start_idx = text.find("[")
+        end_idx = text.rfind("]") + 1
+        if start_idx != -1 and end_idx > start_idx:
+            raw = json.loads(text[start_idx:end_idx])
+            return [
+                {
+                    "name": c.get("name", "Unknown"),
+                    "date": c.get("date", ""),
+                    "end_date": c.get("end_date"),
+                    "location": c.get("location"),
+                    "importance": c.get("importance", 3),
+                    "type": c.get("type"),
+                }
+                for c in raw
+            ]
+        return None
+    except json.JSONDecodeError:
+        return None
